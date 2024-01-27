@@ -27,7 +27,8 @@ class CgenNode;
 // (CgenNodes) by name, and it also handles global code generation tasks.
 // The CgenClassTable constructor is where you'll find the entry point for
 // code generation for an entire Cool program.
-class CgenClassTable : public cool::SymbolTable<CgenNode> {
+class CgenClassTable : public cool::SymbolTable<CgenNode>
+{
 public:
   // CgenClassTable constructor begins and ends the code generation process
   CgenClassTable(Classes);
@@ -88,15 +89,21 @@ public:
 // performing code generation on the class level. This includes laying out
 // the class attributes, creating the necessary Types for the class and
 // generating code for each of its methods.
-class CgenNode : public class__class {
+class CgenNode : public class__class
+{
 public:
-  enum Basicness { Basic, NotBasic };
+  enum Basicness
+  {
+    Basic,
+    NotBasic
+  };
   CgenNode(Class_ c, Basicness bstatus, CgenClassTable *class_table)
       : class__class((const class__class &)*c), parentnd(0), children(0),
         basic_status(bstatus), class_table(class_table), tag(-1) {}
 
   // Relationships with other nodes in the tree
-  void set_parent(CgenNode *p) {
+  void set_parent(CgenNode *p)
+  {
     assert(this->parentnd == nullptr && p != nullptr);
     p->children.push_back(this);
     this->parentnd = p;
@@ -112,10 +119,12 @@ public:
 
 #ifdef LAB2
   std::string get_type_name() { return name->get_string(); }
-  std::string get_vtable_type_name() {
+  std::string get_vtable_type_name()
+  {
     return "_" + get_type_name() + "_vtable";
   }
-  std::string get_vtable_name() {
+  std::string get_vtable_name()
+  {
     return "_" + get_type_name() + "_vtable_prototype";
   }
   std::string get_init_function_name() { return get_type_name() + "_new"; }
@@ -154,7 +163,8 @@ private:
 // variables are declared, and so on. CgenEnvironment is also a good place
 // to put non-local information you will need during code generation. Two
 // examples are the current CgenNode and the current Function.
-class CgenEnvironment {
+class CgenEnvironment
+{
 public:
   // Class CgenEnvironment should be constructed by a class prior to code
   // generation for each method. You may need to add parameters to this
@@ -162,7 +172,8 @@ public:
   CgenEnvironment(CgenNode *cur_class)
       : var_table(), cur_class(cur_class),
         class_table(*cur_class->get_classtable()), context(class_table.context),
-        builder(class_table.builder), the_module(class_table.the_module) {
+        builder(class_table.builder), the_module(class_table.the_module)
+  {
     var_table.enterscope();
     // TODO: add code here
   }
@@ -175,7 +186,8 @@ public:
 
   std::pair<llvm::Type *, llvm::Value *> find_in_scopes(Symbol name);
 
-  void add_binding(Symbol name, llvm::Value *val_ptr) {
+  void add_binding(Symbol name, llvm::Value *val_ptr)
+  {
     var_table.insert(name, val_ptr);
   }
   void open_scope() { var_table.enterscope(); }
@@ -186,13 +198,15 @@ public:
   llvm::Function *create_llvm_function(const std::string &funcName,
                                        llvm::Type *retType,
                                        llvm::ArrayRef<llvm::Type *> argTypes,
-                                       bool isVarArgs) {
+                                       bool isVarArgs)
+  {
     return class_table.create_llvm_function(funcName, retType, argTypes,
                                             isVarArgs);
   }
   // Insert a new BasicBlock at the end of the current function (the function
   // that builder is in)
-  llvm::BasicBlock *new_bb_at_fend(const std::string &name) {
+  llvm::BasicBlock *new_bb_at_fend(const std::string &name)
+  {
     return llvm::BasicBlock::Create(context, name,
                                     builder.GetInsertBlock()->getParent());
   }
