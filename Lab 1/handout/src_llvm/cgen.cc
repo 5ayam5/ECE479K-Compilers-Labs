@@ -375,26 +375,37 @@ void CgenClassTable::code_constants()
 // Create LLVM entry point. This function will initiate our Cool program
 // by generating the code to execute (new Main).main()
 //
-void CgenClassTable::code_main(){
-// TODO: add code here
+void CgenClassTable::code_main()
+{
+  llvm::Constant *str = builder.CreateGlobalStringPtr("Main_main() returned %d\n", ".str");
 
-// Define a function main that has no parameters and returns an i32
+  // Define a function main that has no parameters and returns an i32
+  llvm::Function *mainFunc = create_llvm_function("main", Type::getInt32Ty(context), {}, false);
 
-// Define an entry basic block
+  // Define an entry basic block
+  llvm::BasicBlock *entry_bb = llvm::BasicBlock::Create(context, "entry", mainFunc);
+  builder.SetInsertPoint(entry_bb);
 
-// Call Main_main(). This returns int for phase 1, Object for phase 2
+  // Call Main_main(). This returns int for phase 1, Object for phase 2
+  llvm::Function *Mainmain = the_module.getFunction("Main_main");
+  if (!Mainmain)
+  {
+    throw std::runtime_error("Function Main_main not defined.");
+  }
+  llvm::Value *ret_val = builder.CreateCall(Mainmain, {}, "tmp.0");
 
 #ifdef LAB2
-// LAB2
+  // LAB2
 #else
-// Lab1
-// Get the address of the string "Main_main() returned %d\n" using
-// getelementptr
+  // Lab1
+  // Get the address of the string "Main_main() returned %d\n" using getelementptr
+  llvm::Value *str_ptr = builder.CreateConstGEP2_32(str->getType(), str, 0, 0, "tmp.1");
 
-// Call printf with the string address of "Main_main() returned %d\n"
-// and the return value of Main_main() as its arguments
+  // Call printf with the string address of "Main_main() returned %d\n" and the return value of Main_main() as its arguments
+  builder.CreateCall(the_module.getFunction("printf"), {str_ptr, ret_val}, "tmp.2");
 
-// Insert return 0
+  // Insert return 0
+  builder.CreateRet(llvm::ConstantInt::get(Type::getInt32Ty(context), 0));
 #endif
 }
 
@@ -542,10 +553,8 @@ void CgenNode::codeGenMainmain()
   assert(std::string(this->name->get_string()) == std::string("Main"));
   method_class *mainMethod = (method_class *)features->nth(features->first());
 
-  // TODO: add code here to generate the function `int Mainmain()`.
-  // Generally what you need to do are:
-  // -- setup or create the environment, env, for translating this method
-  // -- invoke mainMethod->code(env) to translate the method
+  CgenEnvironment *env = new CgenEnvironment(this);
+  mainMethod->code(env);
 }
 
 #endif
@@ -636,8 +645,14 @@ Function *method_class::code(CgenEnvironment *env)
     std::cerr << "method" << std::endl;
   }
 
-  // TODO: add code here and replace `return nullptr`
-  return nullptr;
+  llvm::Function *func = env->create_llvm_function(env->get_class()->get_name()->get_string() + '_' + this->name->get_string(), Type::getInt32Ty(env->context), {}, false);
+  llvm::BasicBlock *entry_bb = llvm::BasicBlock::Create(env->context, "entry", func);
+
+  env->builder.SetInsertPoint(entry_bb);
+  llvm::Value *value = expr->code(env);
+
+  env->builder.CreateRet(value);
+  return func;
 }
 
 // Codegen for expressions. Note that each expression has a value.
@@ -647,8 +662,9 @@ Value *assign_class::code(CgenEnvironment *env)
   if (cgen_debug)
     std::cerr << "assign" << std::endl;
 
-  // TODO: add code here and replace `return nullptr`
-  return nullptr;
+  llvm::Value *value = expr->code(env);
+  env->builder.CreateStore(value, env->find_in_scopes(name));
+  return value;
 }
 
 Value *cond_class::code(CgenEnvironment *env)
@@ -656,8 +672,41 @@ Value *cond_class::code(CgenEnvironment *env)
   if (cgen_debug)
     std::cerr << "cond" << std::endl;
 
-  // TODO: add code here and replace `return nullptr`
-  return nullptr;
+  // get value of the condition
+  llvm::Value *cond = pred->code(env);
+
+  // get the current function
+  llvm::Function *func = env->builder.GetInsertBlock()->getParent();
+
+  // create basic blocks for the then, else, and merge
+  llvm::BasicBlock *then_bb = llvm::BasicBlock::Create(env->context, "then", func);
+  llvm::BasicBlock *else_bb = llvm::BasicBlock::Create(env->context, "else");
+  llvm::BasicBlock *merge_bb = llvm::BasicBlock::Create(env->context, "merge");
+
+  // if the condition is true, branch to the then block, else branch to the else block
+  env->builder.CreateCondBr(cond, then_bb, else_bb);
+
+  // emit code for the then block
+  env->builder.SetInsertPoint(then_bb);
+  llvm::Value *then_value = then_exp->code(env);
+  env->builder.CreateBr(merge_bb);
+  then_bb = env->builder.GetInsertBlock();
+
+  // emit code for the else block
+  func->getBasicBlockList().push_back(else_bb);
+  env->builder.SetInsertPoint(else_bb);
+  llvm::Value *else_value = else_exp->code(env);
+  env->builder.CreateBr(merge_bb);
+  else_bb = env->builder.GetInsertBlock();
+
+  // emit code for the merge block
+  func->getBasicBlockList().push_back(merge_bb);
+  env->builder.SetInsertPoint(merge_bb);
+  llvm::PHINode *phi_node = env->builder.CreatePHI(then_value->getType(), 2, "iftmp"); // TODO: change this for Lab 2
+  phi_node->addIncoming(then_value, then_bb);
+  phi_node->addIncoming(else_value, else_bb);
+
+  return phi_node;
 }
 
 Value *loop_class::code(CgenEnvironment *env)
@@ -665,8 +714,30 @@ Value *loop_class::code(CgenEnvironment *env)
   if (cgen_debug)
     std::cerr << "loop" << std::endl;
 
-  // TODO: add code here and replace `return nullptr`
-  return nullptr;
+  // get the current function
+  llvm::Function *func = env->builder.GetInsertBlock()->getParent();
+
+  // create basic blocks for the predicate, body and exit
+  llvm::BasicBlock *pred_bb = llvm::BasicBlock::Create(env->context, "pred", func);
+  llvm::BasicBlock *body_bb = llvm::BasicBlock::Create(env->context, "body");
+  llvm::BasicBlock *exit_bb = llvm::BasicBlock::Create(env->context, "exit");
+
+  // emit code for the predicate block
+  env->builder.CreateBr(pred_bb);
+  env->builder.SetInsertPoint(pred_bb);
+  llvm::Value *cond = pred->code(env);
+  env->builder.CreateCondBr(cond, body_bb, exit_bb);
+
+  // emit code for the body block
+  func->getBasicBlockList().push_back(body_bb);
+  env->builder.SetInsertPoint(body_bb);
+  body->code(env);
+  env->builder.CreateBr(pred_bb);
+
+  // emit code for the exit block
+  func->getBasicBlockList().push_back(exit_bb);
+  env->builder.SetInsertPoint(exit_bb);
+  return llvm::ConstantInt::get(Type::getInt32Ty(env->context), 0);
 }
 
 Value *block_class::code(CgenEnvironment *env)
@@ -674,8 +745,10 @@ Value *block_class::code(CgenEnvironment *env)
   if (cgen_debug)
     std::cerr << "block" << std::endl;
 
-  // TODO: add code here and replace `return nullptr`
-  return nullptr;
+  llvm::Value *value;
+  for (auto expr : body)
+    value = expr->code(env);
+  return value;
 }
 
 Value *let_class::code(CgenEnvironment *env)
@@ -683,8 +756,45 @@ Value *let_class::code(CgenEnvironment *env)
   if (cgen_debug)
     std::cerr << "let" << std::endl;
 
-  // TODO: add code here and replace `return nullptr`
-  return nullptr;
+  env->open_scope();
+  llvm::Value *init_value;
+
+  if (dynamic_cast<no_expr_class *>(init) != nullptr)
+  {
+    if (env->type_to_class(type_decl)->basic())
+    {
+      if (type_decl == Int)
+        init_value = llvm::ConstantInt::get(Type::getInt32Ty(env->context), 0);
+      else if (type_decl == Bool)
+        init_value = llvm::ConstantInt::get(Type::getInt1Ty(env->context), 0);
+#ifdef LAB2
+      else if (type_decl == String)
+      {
+        // TODO: lab 2
+      }
+      else
+      {
+        // TODO: lab 2
+      }
+#endif
+    }
+#ifdef LAB2
+    else
+    {
+      // TODO: lab 2
+    }
+#endif
+  }
+  else
+    init_value = init->code(env);
+
+  llvm::AllocaInst *alloca = env->builder.CreateAlloca(init_value->getType());
+  env->builder.CreateStore(init_value, alloca);
+  env->add_binding(identifier, alloca);
+  llvm::Value *value = body->code(env);
+
+  env->close_scope();
+  return value;
 }
 
 Value *plus_class::code(CgenEnvironment *env)
@@ -692,8 +802,9 @@ Value *plus_class::code(CgenEnvironment *env)
   if (cgen_debug)
     std::cerr << "plus" << std::endl;
 
-  // TODO: add code here and replace `return nullptr`
-  return nullptr;
+  llvm::Value *left = e1->code(env);
+  llvm::Value *right = e2->code(env);
+  return env->builder.CreateAdd(left, right);
 }
 
 Value *sub_class::code(CgenEnvironment *env)
@@ -701,8 +812,9 @@ Value *sub_class::code(CgenEnvironment *env)
   if (cgen_debug)
     std::cerr << "sub" << std::endl;
 
-  // TODO: add code here and replace `return nullptr`
-  return nullptr;
+  llvm::Value *left = e1->code(env);
+  llvm::Value *right = e2->code(env);
+  return env->builder.CreateSub(left, right);
 }
 
 Value *mul_class::code(CgenEnvironment *env)
@@ -710,8 +822,9 @@ Value *mul_class::code(CgenEnvironment *env)
   if (cgen_debug)
     std::cerr << "mul" << std::endl;
 
-  // TODO: add code here and replace `return nullptr`
-  return nullptr;
+  llvm::Value *left = e1->code(env);
+  llvm::Value *right = e2->code(env);
+  return env->builder.CreateMul(left, right);
 }
 
 Value *divide_class::code(CgenEnvironment *env)
@@ -719,8 +832,9 @@ Value *divide_class::code(CgenEnvironment *env)
   if (cgen_debug)
     std::cerr << "div" << std::endl;
 
-  // TODO: add code here and replace `return nullptr`
-  return nullptr;
+  llvm::Value *left = e1->code(env);
+  llvm::Value *right = e2->code(env);
+  return env->builder.CreateSDiv(left, right);
 }
 
 Value *neg_class::code(CgenEnvironment *env)
@@ -728,8 +842,8 @@ Value *neg_class::code(CgenEnvironment *env)
   if (cgen_debug)
     std::cerr << "neg" << std::endl;
 
-  // TODO: add code here and replace `return nullptr`
-  return nullptr;
+  llvm::Value *value = e1->code(env);
+  return env->builder.CreateNeg(value);
 }
 
 Value *lt_class::code(CgenEnvironment *env)
@@ -737,8 +851,9 @@ Value *lt_class::code(CgenEnvironment *env)
   if (cgen_debug)
     std::cerr << "lt" << std::endl;
 
-  // TODO: add code here and replace `return nullptr`
-  return nullptr;
+  llvm::Value *left = e1->code(env);
+  llvm::Value *right = e2->code(env);
+  return env->builder.CreateICmpSLT(left, right);
 }
 
 Value *eq_class::code(CgenEnvironment *env)
@@ -746,8 +861,9 @@ Value *eq_class::code(CgenEnvironment *env)
   if (cgen_debug)
     std::cerr << "eq" << std::endl;
 
-  // TODO: add code here and replace `return nullptr`
-  return nullptr;
+  llvm::Value *left = e1->code(env);
+  llvm::Value *right = e2->code(env);
+  return env->builder.CreateICmpEQ(left, right);
 }
 
 Value *leq_class::code(CgenEnvironment *env)
@@ -755,8 +871,9 @@ Value *leq_class::code(CgenEnvironment *env)
   if (cgen_debug)
     std::cerr << "leq" << std::endl;
 
-  // TODO: add code here and replace `return nullptr`
-  return nullptr;
+  llvm::Value *left = e1->code(env);
+  llvm::Value *right = e2->code(env);
+  return env->builder.CreateICmpSLE(left, right);
 }
 
 Value *comp_class::code(CgenEnvironment *env)
@@ -764,8 +881,8 @@ Value *comp_class::code(CgenEnvironment *env)
   if (cgen_debug)
     std::cerr << "complement" << std::endl;
 
-  // TODO: add code here and replace `return nullptr`
-  return nullptr;
+  llvm::Value *value = e1->code(env);
+  return env->builder.CreateNot(value);
 }
 
 Value *int_const_class::code(CgenEnvironment *env)
@@ -773,8 +890,7 @@ Value *int_const_class::code(CgenEnvironment *env)
   if (cgen_debug)
     std::cerr << "Integer Constant" << std::endl;
 
-  // TODO: add code here and replace `return nullptr`
-  return nullptr;
+  return llvm::ConstantInt::get(Type::getInt32Ty(env->context), token->get_string(), 10);
 }
 
 Value *bool_const_class::code(CgenEnvironment *env)
@@ -782,8 +898,7 @@ Value *bool_const_class::code(CgenEnvironment *env)
   if (cgen_debug)
     std::cerr << "Boolean Constant" << std::endl;
 
-  // TODO: add code here and replace `return nullptr`
-  return nullptr;
+  return llvm::ConstantInt::get(Type::getInt1Ty(env->context), val);
 }
 
 Value *object_class::code(CgenEnvironment *env)
@@ -791,8 +906,8 @@ Value *object_class::code(CgenEnvironment *env)
   if (cgen_debug)
     std::cerr << "Object" << std::endl;
 
-  // TODO: add code here and replace `return nullptr`
-  return nullptr;
+  AllocaInst *alloca = env->find_in_scopes(name);
+  return env->builder.CreateLoad(alloca->getAllocatedType(), alloca);
 }
 
 Value *no_expr_class::code(CgenEnvironment *env)
@@ -800,7 +915,6 @@ Value *no_expr_class::code(CgenEnvironment *env)
   if (cgen_debug)
     std::cerr << "No_expr" << std::endl;
 
-  // TODO: add code here and replace `return nullptr`
   return nullptr;
 }
 

@@ -2,11 +2,11 @@ LEXER = ../reference-binaries/lexer
 PARSER = ../reference-binaries/parser
 SEMANT = ../reference-binaries/semant
 CLANG = clang-15
-OPT = opt-15
+OPT = opt
 
 debug = true
 lab2 = false
-proj_dir = ../src
+proj_dir = ../src_llvm
 
 ifeq ($(debug),true)
   CGENOPTS = -d

@@ -1,3 +1,5 @@
 cgen-1
 *.ast
 *.ll
+*.bin
+*.out

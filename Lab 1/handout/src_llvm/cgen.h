@@ -184,9 +184,12 @@ public:
   // Must return the CgenNode for a class given the symbol of its name
   CgenNode *type_to_class(Symbol t);
 
-  std::pair<llvm::Type *, llvm::Value *> find_in_scopes(Symbol name);
+  llvm::AllocaInst *find_in_scopes(Symbol name)
+  {
+    return var_table.find_in_scopes(name);
+  }
 
-  void add_binding(Symbol name, llvm::Value *val_ptr)
+  void add_binding(Symbol name, llvm::AllocaInst *val_ptr)
   {
     var_table.insert(name, val_ptr);
   }
@@ -223,7 +226,7 @@ public:
 
 private:
   // mapping from variable names to memory locations
-  cool::SymbolTable<llvm::Value> var_table;
+  cool::SymbolTable<llvm::AllocaInst> var_table;
   CgenNode *cur_class;
 
 public:
