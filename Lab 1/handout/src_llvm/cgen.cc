@@ -834,6 +834,15 @@ Value *divide_class::code(CgenEnvironment *env)
 
   llvm::Value *left = e1->code(env);
   llvm::Value *right = e2->code(env);
+
+  // check if right is zero
+  llvm::Value *cmp = env->builder.CreateICmpEQ(right, llvm::ConstantInt::get(Type::getInt32Ty(env->context), 0));
+  llvm::Function *func = env->builder.GetInsertBlock()->getParent();
+  llvm::BasicBlock *abort_bb = env->get_or_insert_abort_block(func);
+  llvm::BasicBlock *cont_bb = env->new_bb_at_fend("cont");
+  env->builder.CreateCondBr(cmp, abort_bb, cont_bb);
+  env->builder.SetInsertPoint(cont_bb);
+
   return env->builder.CreateSDiv(left, right);
 }
 

@@ -47,7 +47,6 @@ private:
   void setup_external_functions();
   void setup_classes(CgenNode *c, int depth);
 
-  // TODO: implement the following functions.
   // Setup each class in the table and prepare for code generation phase
   void setup();
   // Code generation functions. You need to write these functions.
@@ -130,9 +129,6 @@ public:
   std::string get_init_function_name() { return get_type_name() + "_new"; }
 #endif
 
-  // TODO: Complete the implementations of following functions
-  // and add more as necessary
-
   // Class setup. You need to write the body of this function.
   void setup(int tag, int depth);
 #ifdef LAB2
@@ -153,8 +149,6 @@ private:
   // Class tag. Should be unique for each class in the tree
   int tag, max_child;
   std::ostream *ct_stream;
-
-  // TODO: Add more functions / fields here as necessary.
 };
 
 // CgenEnvironment provides the environment for code generation of a method.
@@ -175,7 +169,6 @@ public:
         builder(class_table.builder), the_module(class_table.the_module)
   {
     var_table.enterscope();
-    // TODO: add code here
   }
 
   CgenNode *get_class() { return cur_class; }
@@ -206,6 +199,7 @@ public:
     return class_table.create_llvm_function(funcName, retType, argTypes,
                                             isVarArgs);
   }
+
   // Insert a new BasicBlock at the end of the current function (the function
   // that builder is in)
   llvm::BasicBlock *new_bb_at_fend(const std::string &name)
@@ -213,6 +207,7 @@ public:
     return llvm::BasicBlock::Create(context, name,
                                     builder.GetInsertBlock()->getParent());
   }
+
   // Insert an alloca instruction in the head BasicBlock of the current
   // function, such that this alloca is available in all BasicBlocks of the
   // function.
@@ -221,8 +216,6 @@ public:
   // function. This block will be inserted at the end of the given function,
   // without moving the builder.
   llvm::BasicBlock *get_or_insert_abort_block(llvm::Function *f);
-
-  // TODO: Add more functions as necessary.
 
 private:
   // mapping from variable names to memory locations
