@@ -377,7 +377,7 @@ void CgenClassTable::code_constants()
 //
 void CgenClassTable::code_main()
 {
-  llvm::Constant *str = builder.CreateGlobalStringPtr("Main_main() returned %d\n", ".str");
+  llvm::Constant *str = builder.CreateGlobalStringPtr("Main.main() returned %d\n", ".str");
 
   // Define a function main that has no parameters and returns an i32
   llvm::Function *mainFunc = create_llvm_function("main", Type::getInt32Ty(context), {}, false);
@@ -645,7 +645,7 @@ Function *method_class::code(CgenEnvironment *env)
     std::cerr << "method" << std::endl;
   }
 
-  llvm::Function *func = env->create_llvm_function(env->get_class()->get_name()->get_string() + '_' + this->name->get_string(), Type::getInt32Ty(env->context), {}, false);
+  llvm::Function *func = env->create_llvm_function(env->get_class()->get_name()->get_string() + '.' + this->name->get_string(), Type::getInt32Ty(env->context), {}, false);
   llvm::BasicBlock *entry_bb = llvm::BasicBlock::Create(env->context, "entry", func);
 
   env->builder.SetInsertPoint(entry_bb);
