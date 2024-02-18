@@ -42,7 +42,7 @@ digit       [0-9]
   * Define regular expressions for the tokens of COOL here. Make sure, you
   * handle correctly special cases, like:
   *   - Nested comments
-  *   - String constants: They use C like systax and can contain escape
+  *   - String constants: They use C like syntax and can contain escape
   *     sequences. Escape sequence \c is accepted for all characters c. Except
   *     for \n \t \b \f, the result is c.
   *   - Keywords: They are case-insensitive except for the values true and

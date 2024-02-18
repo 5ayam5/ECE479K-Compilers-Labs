@@ -387,7 +387,7 @@ void CgenClassTable::code_main()
   builder.SetInsertPoint(entry_bb);
 
   // Call Main_main(). This returns int for phase 1, Object for phase 2
-  llvm::Function *Mainmain = the_module.getFunction("Main_main");
+  llvm::Function *Mainmain = the_module.getFunction("Main.main");
   if (!Mainmain)
   {
     throw std::runtime_error("Function Main_main not defined.");
