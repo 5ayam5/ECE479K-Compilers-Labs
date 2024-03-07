@@ -11,7 +11,6 @@
 #include <llvm/Support/FileSystem.h>
 
 extern int cgen_debug, curr_lineno;
-using namespace llvm;
 
 /*********************************************************************
  For convenience, a large number of symbols are predefined here.
@@ -303,9 +302,9 @@ void CgenClassTable::set_relations(CgenNode *nd)
 // You should not need to modify this code for Lab1
 void CgenClassTable::setup_external_functions()
 {
-  Type *i32 = Type::getInt32Ty(this->context),
-       *i8_ptr = Type::getInt8PtrTy(this->context),
-       *void_ = Type::getVoidTy(this->context);
+  llvm::Type *i32 = llvm::Type::getInt32Ty(this->context),
+       *i8_ptr = llvm::Type::getInt8PtrTy(this->context),
+       *void_ = llvm::Type::getVoidTy(this->context);
   // setup function: external int strcmp(sbyte*, sbyte*)
   create_llvm_function("strcmp", i32, {i8_ptr, i8_ptr}, false);
   // setup function: external int printf(sbyte*, ...)
@@ -380,7 +379,7 @@ void CgenClassTable::code_main()
   llvm::Constant *str = builder.CreateGlobalStringPtr("Main.main() returned %d\n", ".str");
 
   // Define a function main that has no parameters and returns an i32
-  llvm::Function *mainFunc = create_llvm_function("main", Type::getInt32Ty(context), {}, false);
+  llvm::Function *mainFunc = create_llvm_function("main", llvm::Type::getInt32Ty(context), {}, false);
 
   // Define an entry basic block
   llvm::BasicBlock *entry_bb = llvm::BasicBlock::Create(context, "entry", mainFunc);
@@ -405,7 +404,7 @@ void CgenClassTable::code_main()
   builder.CreateCall(the_module.getFunction("printf"), {str_ptr, ret_val}, "tmp.2");
 
   // Insert return 0
-  builder.CreateRet(llvm::ConstantInt::get(Type::getInt32Ty(context), 0));
+  builder.CreateRet(llvm::ConstantInt::get(llvm::Type::getInt32Ty(context), 0));
 #endif
 }
 
@@ -436,18 +435,18 @@ CgenNode *CgenClassTable::getMainmain(CgenNode *c)
 }
 #endif
 
-Function *CgenClassTable::create_llvm_function(const std::string &funcName,
-                                               Type *retType,
-                                               ArrayRef<Type *> argTypes,
+llvm::Function *CgenClassTable::create_llvm_function(const std::string &funcName,
+                                               llvm::Type *retType,
+                                               llvm::ArrayRef<llvm::Type *> argTypes,
                                                bool isVarArgs)
 {
   assert(retType);
-  FunctionType *ft = FunctionType::get(retType, argTypes, isVarArgs);
-  Function *func = Function::Create(ft, Function::ExternalLinkage, funcName,
+  llvm::FunctionType *ft = llvm::FunctionType::get(retType, argTypes, isVarArgs);
+  llvm::Function *func = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, funcName,
                                     this->the_module);
   if (!func)
   {
-    errs() << "Function creation failed for function " << funcName;
+    llvm::errs() << "Function creation failed for function " << funcName;
     llvm_unreachable("Function creation failed");
   }
   return func;
@@ -524,10 +523,24 @@ void CgenNode::setup(int tag, int depth)
 // and assigning each attribute a slot in the class structure.
 void CgenNode::layout_features()
 {
-  // TODO: add code here
+  this->env = new CgenEnvironment(this);
+  llvm::StructType *struct_type = this->get_classtable()->get_struct_type(this->get_type_name());
+  llvm::Type *vtable_ptr_type = this->get_classtable()->get_struct_type(this->get_vtable_type_name())->getPointerTo();
+
+  std::vector<llvm::Type *> struct_types;
+  struct_types.push_back(vtable_ptr_type);
+  for (auto feature : this->features)
+  {
+    if (auto attr = dynamic_cast<attr_class *>(feature))
+      struct_types.push_back(this->get_classtable()->get_struct_type(attr->get_name()->get_string()));
+    else if (auto method = dynamic_cast<method_class *>(feature))
+      assert(false && "Method layout not implemented");
+  }
+  struct_type->setBody(struct_types);
+  // TODO: layout vtable and methods
 }
 
-// Class codegen. This should performed after every class has been setup.
+// Class codegen. This should be performed after every class has been setup.
 // Generate code for each method of the class.
 void CgenNode::code_class()
 {
@@ -572,7 +585,7 @@ CgenNode *CgenEnvironment::type_to_class(Symbol t)
                         : get_class()->get_classtable()->find_in_scopes(t);
 }
 
-BasicBlock *CgenEnvironment::get_or_insert_abort_block(Function *f)
+llvm::BasicBlock *CgenEnvironment::get_or_insert_abort_block(llvm::Function *f)
 {
   for (auto &bb : *f)
   {
@@ -581,27 +594,27 @@ BasicBlock *CgenEnvironment::get_or_insert_abort_block(Function *f)
       return &bb;
     }
   }
-  auto *abort_bb = BasicBlock::Create(this->context, "abort", f);
-  Type *void_ = Type::getVoidTy(this->context);
-  IRBuilder<> builder(abort_bb);
-  FunctionCallee abort = this->the_module.getOrInsertFunction("abort", void_);
+  auto *abort_bb = llvm::BasicBlock::Create(this->context, "abort", f);
+  llvm::Type *void_ = llvm::Type::getVoidTy(this->context);
+  llvm::IRBuilder<> builder(abort_bb);
+  llvm::FunctionCallee abort = this->the_module.getOrInsertFunction("abort", void_);
   builder.CreateCall(abort, {});
   builder.CreateUnreachable();
   return abort_bb;
 }
 
-AllocaInst *CgenEnvironment::insert_alloca_at_head(Type *ty)
+llvm::AllocaInst *CgenEnvironment::insert_alloca_at_head(llvm::Type *ty)
 {
-  BasicBlock &entry_bb = builder.GetInsertBlock()->getParent()->getEntryBlock();
+  llvm::BasicBlock &entry_bb = builder.GetInsertBlock()->getParent()->getEntryBlock();
   if (entry_bb.empty())
   {
     // Insert "at the end" of this bb
-    return new AllocaInst(ty, 0, "", &entry_bb);
+    return new llvm::AllocaInst(ty, 0, "", &entry_bb);
   }
   else
   {
     // Insert before the first instruction of this bb
-    return new AllocaInst(ty, 0, "", &entry_bb.front());
+    return new llvm::AllocaInst(ty, 0, "", &entry_bb.front());
   }
 }
 
@@ -623,7 +636,7 @@ void program_class::cgen(const std::optional<std::string> &outfile)
   if (outfile)
   {
     std::error_code err;
-    raw_fd_ostream s(*outfile, err, sys::fs::FA_Write);
+    llvm::raw_fd_ostream s(*outfile, err, llvm::sys::fs::FA_Write);
     if (err)
     {
       std::cerr << "Cannot open output file " << *outfile << std::endl;
@@ -633,19 +646,19 @@ void program_class::cgen(const std::optional<std::string> &outfile)
   }
   else
   {
-    outs() << class_table->the_module;
+    llvm::outs() << class_table->the_module;
   }
 }
 
 // Create a method body
-Function *method_class::code(CgenEnvironment *env)
+llvm::Function *method_class::code(CgenEnvironment *env)
 {
   if (cgen_debug)
   {
     std::cerr << "method" << std::endl;
   }
 
-  llvm::Function *func = env->create_llvm_function(env->get_class()->get_name()->get_string() + '.' + this->name->get_string(), Type::getInt32Ty(env->context), {}, false);
+  llvm::Function *func = env->create_llvm_function(env->get_class()->get_name()->get_string() + '.' + this->name->get_string(), llvm::Type::getInt32Ty(env->context), {}, false);
   llvm::BasicBlock *entry_bb = llvm::BasicBlock::Create(env->context, "entry", func);
 
   env->builder.SetInsertPoint(entry_bb);
@@ -657,7 +670,7 @@ Function *method_class::code(CgenEnvironment *env)
 
 // Codegen for expressions. Note that each expression has a value.
 
-Value *assign_class::code(CgenEnvironment *env)
+llvm::Value *assign_class::code(CgenEnvironment *env)
 {
   if (cgen_debug)
     std::cerr << "assign" << std::endl;
@@ -667,7 +680,7 @@ Value *assign_class::code(CgenEnvironment *env)
   return value;
 }
 
-Value *cond_class::code(CgenEnvironment *env)
+llvm::Value *cond_class::code(CgenEnvironment *env)
 {
   if (cgen_debug)
     std::cerr << "cond" << std::endl;
@@ -709,7 +722,7 @@ Value *cond_class::code(CgenEnvironment *env)
   return phi_node;
 }
 
-Value *loop_class::code(CgenEnvironment *env)
+llvm::Value *loop_class::code(CgenEnvironment *env)
 {
   if (cgen_debug)
     std::cerr << "loop" << std::endl;
@@ -737,10 +750,10 @@ Value *loop_class::code(CgenEnvironment *env)
   // emit code for the exit block
   func->getBasicBlockList().push_back(exit_bb);
   env->builder.SetInsertPoint(exit_bb);
-  return llvm::ConstantInt::get(Type::getInt32Ty(env->context), 0);
+  return llvm::ConstantInt::get(llvm::Type::getInt32Ty(env->context), 0);
 }
 
-Value *block_class::code(CgenEnvironment *env)
+llvm::Value *block_class::code(CgenEnvironment *env)
 {
   if (cgen_debug)
     std::cerr << "block" << std::endl;
@@ -751,7 +764,7 @@ Value *block_class::code(CgenEnvironment *env)
   return value;
 }
 
-Value *let_class::code(CgenEnvironment *env)
+llvm::Value *let_class::code(CgenEnvironment *env)
 {
   if (cgen_debug)
     std::cerr << "let" << std::endl;
@@ -764,9 +777,9 @@ Value *let_class::code(CgenEnvironment *env)
     if (env->type_to_class(type_decl)->basic())
     {
       if (type_decl == Int)
-        init_value = llvm::ConstantInt::get(Type::getInt32Ty(env->context), 0);
+        init_value = llvm::ConstantInt::get(llvm::Type::getInt32Ty(env->context), 0);
       else if (type_decl == Bool)
-        init_value = llvm::ConstantInt::get(Type::getInt1Ty(env->context), 0);
+        init_value = llvm::ConstantInt::get(llvm::Type::getInt1Ty(env->context), 0);
 #ifdef LAB2
       else if (type_decl == String)
       {
@@ -797,7 +810,7 @@ Value *let_class::code(CgenEnvironment *env)
   return value;
 }
 
-Value *plus_class::code(CgenEnvironment *env)
+llvm::Value *plus_class::code(CgenEnvironment *env)
 {
   if (cgen_debug)
     std::cerr << "plus" << std::endl;
@@ -807,7 +820,7 @@ Value *plus_class::code(CgenEnvironment *env)
   return env->builder.CreateAdd(left, right);
 }
 
-Value *sub_class::code(CgenEnvironment *env)
+llvm::Value *sub_class::code(CgenEnvironment *env)
 {
   if (cgen_debug)
     std::cerr << "sub" << std::endl;
@@ -817,7 +830,7 @@ Value *sub_class::code(CgenEnvironment *env)
   return env->builder.CreateSub(left, right);
 }
 
-Value *mul_class::code(CgenEnvironment *env)
+llvm::Value *mul_class::code(CgenEnvironment *env)
 {
   if (cgen_debug)
     std::cerr << "mul" << std::endl;
@@ -827,7 +840,7 @@ Value *mul_class::code(CgenEnvironment *env)
   return env->builder.CreateMul(left, right);
 }
 
-Value *divide_class::code(CgenEnvironment *env)
+llvm::Value *divide_class::code(CgenEnvironment *env)
 {
   if (cgen_debug)
     std::cerr << "div" << std::endl;
@@ -836,7 +849,7 @@ Value *divide_class::code(CgenEnvironment *env)
   llvm::Value *right = e2->code(env);
 
   // check if right is zero
-  llvm::Value *cmp = env->builder.CreateICmpEQ(right, llvm::ConstantInt::get(Type::getInt32Ty(env->context), 0));
+  llvm::Value *cmp = env->builder.CreateICmpEQ(right, llvm::ConstantInt::get(llvm::Type::getInt32Ty(env->context), 0));
   llvm::Function *func = env->builder.GetInsertBlock()->getParent();
   llvm::BasicBlock *abort_bb = env->get_or_insert_abort_block(func);
   llvm::BasicBlock *cont_bb = env->new_bb_at_fend("cont");
@@ -846,7 +859,7 @@ Value *divide_class::code(CgenEnvironment *env)
   return env->builder.CreateSDiv(left, right);
 }
 
-Value *neg_class::code(CgenEnvironment *env)
+llvm::Value *neg_class::code(CgenEnvironment *env)
 {
   if (cgen_debug)
     std::cerr << "neg" << std::endl;
@@ -855,7 +868,7 @@ Value *neg_class::code(CgenEnvironment *env)
   return env->builder.CreateNeg(value);
 }
 
-Value *lt_class::code(CgenEnvironment *env)
+llvm::Value *lt_class::code(CgenEnvironment *env)
 {
   if (cgen_debug)
     std::cerr << "lt" << std::endl;
@@ -865,7 +878,7 @@ Value *lt_class::code(CgenEnvironment *env)
   return env->builder.CreateICmpSLT(left, right);
 }
 
-Value *eq_class::code(CgenEnvironment *env)
+llvm::Value *eq_class::code(CgenEnvironment *env)
 {
   if (cgen_debug)
     std::cerr << "eq" << std::endl;
@@ -875,7 +888,7 @@ Value *eq_class::code(CgenEnvironment *env)
   return env->builder.CreateICmpEQ(left, right);
 }
 
-Value *leq_class::code(CgenEnvironment *env)
+llvm::Value *leq_class::code(CgenEnvironment *env)
 {
   if (cgen_debug)
     std::cerr << "leq" << std::endl;
@@ -885,7 +898,7 @@ Value *leq_class::code(CgenEnvironment *env)
   return env->builder.CreateICmpSLE(left, right);
 }
 
-Value *comp_class::code(CgenEnvironment *env)
+llvm::Value *comp_class::code(CgenEnvironment *env)
 {
   if (cgen_debug)
     std::cerr << "complement" << std::endl;
@@ -894,32 +907,32 @@ Value *comp_class::code(CgenEnvironment *env)
   return env->builder.CreateNot(value);
 }
 
-Value *int_const_class::code(CgenEnvironment *env)
+llvm::Value *int_const_class::code(CgenEnvironment *env)
 {
   if (cgen_debug)
     std::cerr << "Integer Constant" << std::endl;
 
-  return llvm::ConstantInt::get(Type::getInt32Ty(env->context), token->get_string(), 10);
+  return llvm::ConstantInt::get(llvm::Type::getInt32Ty(env->context), token->get_string(), 10);
 }
 
-Value *bool_const_class::code(CgenEnvironment *env)
+llvm::Value *bool_const_class::code(CgenEnvironment *env)
 {
   if (cgen_debug)
     std::cerr << "Boolean Constant" << std::endl;
 
-  return llvm::ConstantInt::get(Type::getInt1Ty(env->context), val);
+  return llvm::ConstantInt::get(llvm::Type::getInt1Ty(env->context), val);
 }
 
-Value *object_class::code(CgenEnvironment *env)
+llvm::Value *object_class::code(CgenEnvironment *env)
 {
   if (cgen_debug)
     std::cerr << "Object" << std::endl;
 
-  AllocaInst *alloca = env->find_in_scopes(name);
+  llvm::AllocaInst *alloca = env->find_in_scopes(name);
   return env->builder.CreateLoad(alloca->getAllocatedType(), alloca);
 }
 
-Value *no_expr_class::code(CgenEnvironment *env)
+llvm::Value *no_expr_class::code(CgenEnvironment *env)
 {
   if (cgen_debug)
     std::cerr << "No_expr" << std::endl;
@@ -933,7 +946,7 @@ Value *no_expr_class::code(CgenEnvironment *env)
 // methods via the Expression_SHARED_EXTRAS hack.
 //*****************************************************************
 
-Value *static_dispatch_class::code(CgenEnvironment *env)
+llvm::Value *static_dispatch_class::code(CgenEnvironment *env)
 {
   if (cgen_debug)
     std::cerr << "static dispatch" << std::endl;
@@ -945,7 +958,7 @@ Value *static_dispatch_class::code(CgenEnvironment *env)
 #endif
 }
 
-Value *string_const_class::code(CgenEnvironment *env)
+llvm::Value *string_const_class::code(CgenEnvironment *env)
 {
   if (cgen_debug)
     std::cerr << "string_const" << std::endl;
@@ -957,7 +970,7 @@ Value *string_const_class::code(CgenEnvironment *env)
 #endif
 }
 
-Value *dispatch_class::code(CgenEnvironment *env)
+llvm::Value *dispatch_class::code(CgenEnvironment *env)
 {
   if (cgen_debug)
     std::cerr << "dispatch" << std::endl;
@@ -970,7 +983,7 @@ Value *dispatch_class::code(CgenEnvironment *env)
 }
 
 // Handle a Cool case expression (selecting based on the type of an object)
-Value *typcase_class::code(CgenEnvironment *env)
+llvm::Value *typcase_class::code(CgenEnvironment *env)
 {
   if (cgen_debug)
     std::cerr << "typecase::code()" << std::endl;
@@ -982,7 +995,7 @@ Value *typcase_class::code(CgenEnvironment *env)
 #endif
 }
 
-Value *new__class::code(CgenEnvironment *env)
+llvm::Value *new__class::code(CgenEnvironment *env)
 {
   if (cgen_debug)
     std::cerr << "newClass" << std::endl;
@@ -994,7 +1007,7 @@ Value *new__class::code(CgenEnvironment *env)
 #endif
 }
 
-Value *isvoid_class::code(CgenEnvironment *env)
+llvm::Value *isvoid_class::code(CgenEnvironment *env)
 {
   if (cgen_debug)
     std::cerr << "isvoid" << std::endl;
@@ -1021,7 +1034,7 @@ void method_class::layout_feature(CgenNode *cls)
 // and <= (max child of the branch class) tag,
 // then the branch is a superclass of the source.
 // See the LAB2 handout for more information about our use of class tags.
-Value *branch_class::code(Value *expr_val, Value *tag, Type *join_type,
+llvm::Value *branch_class::code(llvm::Value *expr_val, llvm::Value *tag, llvm::Type *join_type,
                           CgenEnvironment *env)
 {
 #ifndef LAB2
@@ -1042,7 +1055,7 @@ void attr_class::layout_feature(CgenNode *cls)
 #endif
 }
 
-Value *attr_class::code(CgenEnvironment *env)
+llvm::Value *attr_class::code(CgenEnvironment *env)
 {
 #ifndef LAB2
   assert(0 && "Unsupported case for phase 1");

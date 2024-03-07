@@ -77,6 +77,13 @@ public:
                                        llvm::ArrayRef<llvm::Type *> argTypes,
                                        bool isVarArgs);
 
+  llvm::StructType *get_struct_type(const std::string &class_name)
+  {
+    if (StructType::getTypeByName(context, class_name) != nullptr)
+      return StructType::getTypeByName(context, class_name);
+    return StructType::create(context, class_name);
+  }
+
   // CgenClassTable owns the current LLVM module and everything attached.
   // One program, one class table, one module.
   llvm::LLVMContext context;
@@ -149,6 +156,7 @@ private:
   // Class tag. Should be unique for each class in the tree
   int tag, max_child;
   std::ostream *ct_stream;
+  CgenEnvironment *env;
 };
 
 // CgenEnvironment provides the environment for code generation of a method.
