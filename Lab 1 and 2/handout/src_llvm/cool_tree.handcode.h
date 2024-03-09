@@ -50,7 +50,7 @@ typedef Cases_class *Cases;
 
 #define Feature_EXTRAS                                                         \
   virtual void dump_with_types(std::ostream &, int) = 0;                       \
-  virtual void layout_feature(CgenNode *cls) = 0;                              \
+  virtual llvm::Type *layout_feature(CgenNode *cls) = 0;                       \
   virtual llvm::Value *code(CgenEnvironment *) = 0;                            \
   virtual Symbol get_name() = 0;
 
@@ -79,7 +79,7 @@ typedef Cases_class *Cases;
 
 #define Feature_SHARED_EXTRAS                                                  \
   void dump_with_types(std::ostream &, int);                                   \
-  void layout_feature(CgenNode *cls);                                          \
+  llvm::Type *layout_feature(CgenNode *cls);                                   \
   Symbol get_name() { return name; }
 
 #define method_EXTRAS                                                          \

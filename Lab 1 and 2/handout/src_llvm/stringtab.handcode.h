@@ -4,17 +4,19 @@
 #define STRINGTAB_HANDCODE_H
 
 #include <iostream>
+#include <llvm/IR/GlobalVariable.h>
 class CgenClassTable;
 
 // Extra methods added to classes in stringtab.h
 #define StringEntry_EXTRAS                                                     \
-  void code_def(std::ostream &str, CgenClassTable *classTable);                \
-  void code_ref(std::ostream &str, CgenClassTable *classTable);                \
+  void code_def(CgenClassTable *classTable);                                   \
+  void code_ref(CgenClassTable *classTable);                                   \
+  llvm::GlobalVariable *value;                                                 \
 
 #define IntEntry_EXTRAS                                                        \
-  void code_ref(std::ostream &str, CgenClassTable *classTable);
+  void code_ref(CgenClassTable *classTable);
 
 #define StrTable_EXTRAS                                                        \
-  void code_string_table(std::ostream &, CgenClassTable *classTable);
+  void code_string_table(CgenClassTable *classTable);
 
 #endif /* STRINGTAB_HANDCODE_H */

@@ -1,23 +1,47 @@
-class Main {
-  main(): Int {
-      let x: Int <- 1 in
-      let y: Int <- 2 in
-      {
-        while x < 3 loop 
-          if x < 2 then
-            let x : Int <- 10 in
-            {
-              y <- x;
-            }
-            else
-            {
-              y <- x
-            }
-            fi;
-            x <- y;
-        pool;
-        x;
-      }
+class A
+{
+  x : Int;
 
+  getA() : A
+  {
+    self
+  };
+};
+
+class B
+{
+  a : A;
+
+  getB() : B
+  {
+    self
+  };
+
+  test() : Bool
+  {
+    true
+  };
+};
+
+class C inherits B
+{
+  y : String;
+
+  getC() : C
+  {
+    self
+  };
+
+  test() : Bool
+  {
+    false
+  };
+};
+
+class Main inherits IO
+{
+  main() : Int
+  {
+    0
   };
 };

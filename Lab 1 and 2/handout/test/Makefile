@@ -5,7 +5,7 @@ CLANG = clang-15
 OPT = opt
 
 debug = true
-lab2 = false
+lab2 = true
 proj_dir = ../src_llvm
 
 ifeq ($(debug),true)

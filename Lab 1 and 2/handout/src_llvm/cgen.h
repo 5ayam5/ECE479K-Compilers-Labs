@@ -77,11 +77,11 @@ public:
                                        llvm::ArrayRef<llvm::Type *> argTypes,
                                        bool isVarArgs);
 
-  llvm::StructType *get_struct_type(const std::string &class_name)
+  llvm::StructType *get_struct_type(const std::string &name)
   {
-    if (StructType::getTypeByName(context, class_name) != nullptr)
-      return StructType::getTypeByName(context, class_name);
-    return StructType::create(context, class_name);
+    if (llvm::StructType::getTypeByName(context, name) != nullptr)
+      return llvm::StructType::getTypeByName(context, name);
+    return llvm::StructType::create(context, name);
   }
 
   // CgenClassTable owns the current LLVM module and everything attached.
@@ -157,6 +157,8 @@ private:
   int tag, max_child;
   std::ostream *ct_stream;
   CgenEnvironment *env;
+  std::vector<llvm::Constant *> vtable_methods;
+  std::unordered_map<std::string, std::string> method_names;
 };
 
 // CgenEnvironment provides the environment for code generation of a method.

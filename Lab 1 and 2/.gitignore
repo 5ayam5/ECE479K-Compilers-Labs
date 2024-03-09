@@ -1,4 +1,5 @@
 cgen-1
+cgen-2
 *.ast
 *.ll
 *.bin
