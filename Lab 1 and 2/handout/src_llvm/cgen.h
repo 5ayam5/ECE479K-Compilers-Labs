@@ -159,6 +159,13 @@ public:
         return {i + 3, vtable_types[i]};
     return {-1, nullptr};
   }
+  std::string get_method_name(Symbol name)
+  {
+    for (auto &m : methods)
+      if (m.first == name->get_string())
+        return m.second;
+    return "";
+  }
 #endif
   void codeGenMainmain();
 

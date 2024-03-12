@@ -12,15 +12,18 @@ class Test
 {
   main : Main;
 
-  run() : Bool
+  run() : Int
   {
-    main.main()
+    {
+      main.main();
+      0;
+    }
   };
 };
 
 class B
 {
-  a : A;
+  a : A <- new A;
 
   getB() : B
   {
@@ -59,6 +62,7 @@ class C inherits B
 class Main inherits IO
 {
   c : C <- new C;
+  x : Int;
 
   test(b : B) : Bool
   {
@@ -68,10 +72,18 @@ class Main inherits IO
   main() : Bool
   {
     {
-      -- c@B.test();
-      test(c);
-      -- c = c;
-      -- let b : B <- c in b.test();
+      if c.test() then self.out_string("true\n") else self.out_string("false\n") fi;
+      c.test(); -- TODO: fix this
+      self.out_string("true\n");
+      let x : Int <- in_int() in x; -- TODO: fix this
+      self.out_int(x);
+      self;
+      test(c); -- TODO: fix this
+      if c = c then self.out_string("c = c\n") else self.out_string("c != c\n") fi;
+      let x : Int <- 12 in self.out_int(x);
+      if let b : B <- new C in b@B.test() then self.out_string("true\n") else self.out_string("false\n") fi;
+      "c".concat("b") = "a"; -- TODO: fix this
+      true;
     }
   };
 };
