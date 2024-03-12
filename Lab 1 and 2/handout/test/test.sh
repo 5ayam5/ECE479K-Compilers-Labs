@@ -10,10 +10,12 @@ for file in $dir/*; do
         # run the file
         make $dir/$filename.out > /dev/null 2>&1
         # compare the output with the expected output
-        diff $dir/$filename.refout $dir/$filename.out
+        diff $dir/$filename.refout $dir/$filename.out > /dev/null 2>&1
         # if the output is different, print the file name
         if [ $? -ne 0 ]; then
             echo "Test failed: $filename"
+        else
+            echo "Test passed: $filename"
         fi
     fi
 done

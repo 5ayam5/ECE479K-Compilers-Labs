@@ -8,13 +8,31 @@ class A
   };
 };
 
+class Test
+{
+  main : Main;
+
+  run() : Bool
+  {
+    main.main()
+  };
+};
+
 class B
 {
   a : A;
 
   getB() : B
   {
-    self
+    {
+      test();
+      self;
+    }
+  };
+
+  getConstString() : String
+  {
+    "const string this is\n"
   };
 
   test() : Bool
@@ -40,8 +58,20 @@ class C inherits B
 
 class Main inherits IO
 {
-  main() : Int
+  c : C <- new C;
+
+  test(b : B) : Bool
   {
-    0
+    b.test()
+  };
+
+  main() : Bool
+  {
+    {
+      -- c@B.test();
+      test(c);
+      -- c = c;
+      -- let b : B <- c in b.test();
+    }
   };
 };

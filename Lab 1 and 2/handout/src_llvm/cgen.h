@@ -145,6 +145,20 @@ public:
   void code_class();
   // Codegen for the init function of every class
   void code_init_function(CgenEnvironment *env);
+  Features get_features() { return features; }
+  std::pair<int, llvm::Type *> get_layed_out_attr(Symbol name)
+  {
+    if (attributes.find(name) != attributes.end())
+      return attributes[name];
+    return std::make_pair(-1, nullptr);
+  }
+  std::pair<int, llvm::Type *> get_method_offset_and_type(Symbol name)
+  {
+    for (unsigned int i = 0; i < methods.size(); i++)
+      if (methods[i].first == name->get_string())
+        return {i + 3, vtable_types[i]};
+    return {-1, nullptr};
+  }
 #endif
   void codeGenMainmain();
 
@@ -157,8 +171,10 @@ private:
   int tag, max_child;
   std::ostream *ct_stream;
   CgenEnvironment *env;
+  std::unordered_map<Symbol, std::pair<int, llvm::Type *>> attributes;
   std::vector<llvm::Constant *> vtable_methods;
-  std::unordered_map<std::string, std::string> method_names;
+  std::vector<llvm::Type *> vtable_types;
+  std::vector<std::pair<std::string, std::string>> methods;
 };
 
 // CgenEnvironment provides the environment for code generation of a method.
