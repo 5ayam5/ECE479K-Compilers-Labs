@@ -781,10 +781,13 @@ llvm::Function *method_class::code(CgenEnvironment *env)
 #ifdef LAB2
   env->close_scope();
   env->close_scope();
-  if (return_type == SELF_TYPE)
-    value = conform(value, env->class_table.get_struct_type(env->get_class()->get_type_name()), env);
+  Symbol ret_type = return_type == SELF_TYPE ? env->get_class()->get_name() : return_type;
+  if (ret_type == Int)
+    value = conform(value, llvm::Type::getInt32Ty(env->context), env);
+  else if (ret_type == Bool)
+    value = conform(value, llvm::Type::getInt1Ty(env->context), env);
   else
-    value = conform(value, env->class_table.get_struct_type(return_type->get_string()), env);
+    value = conform(value, env->class_table.get_struct_type(ret_type->get_string()), env);
 #endif
   env->builder.CreateRet(value);
   return func;
@@ -934,8 +937,8 @@ llvm::Value *plus_class::code(CgenEnvironment *env)
   if (cgen_debug)
     llvm::errs() << "plus" << '\n';
 
-  llvm::Value *left = e1->code(env);
-  llvm::Value *right = e2->code(env);
+  llvm::Value *left = conform(e1->code(env), llvm::Type::getInt32Ty(env->context), env);
+  llvm::Value *right = conform(e2->code(env), llvm::Type::getInt32Ty(env->context), env);
   return env->builder.CreateAdd(left, right);
 }
 
@@ -944,8 +947,8 @@ llvm::Value *sub_class::code(CgenEnvironment *env)
   if (cgen_debug)
     llvm::errs() << "sub" << '\n';
 
-  llvm::Value *left = e1->code(env);
-  llvm::Value *right = e2->code(env);
+  llvm::Value *left = conform(e1->code(env), llvm::Type::getInt32Ty(env->context), env);
+  llvm::Value *right = conform(e2->code(env), llvm::Type::getInt32Ty(env->context), env);
   return env->builder.CreateSub(left, right);
 }
 
@@ -954,8 +957,8 @@ llvm::Value *mul_class::code(CgenEnvironment *env)
   if (cgen_debug)
     llvm::errs() << "mul" << '\n';
 
-  llvm::Value *left = e1->code(env);
-  llvm::Value *right = e2->code(env);
+  llvm::Value *left = conform(e1->code(env), llvm::Type::getInt32Ty(env->context), env);
+  llvm::Value *right = conform(e2->code(env), llvm::Type::getInt32Ty(env->context), env);
   return env->builder.CreateMul(left, right);
 }
 
@@ -964,8 +967,8 @@ llvm::Value *divide_class::code(CgenEnvironment *env)
   if (cgen_debug)
     llvm::errs() << "div" << '\n';
 
-  llvm::Value *left = e1->code(env);
-  llvm::Value *right = e2->code(env);
+  llvm::Value *left = conform(e1->code(env), llvm::Type::getInt32Ty(env->context), env);
+  llvm::Value *right = conform(e2->code(env), llvm::Type::getInt32Ty(env->context), env);
 
   // check if right is zero
   llvm::Value *cmp = env->builder.CreateICmpEQ(right, llvm::ConstantInt::get(llvm::Type::getInt32Ty(env->context), 0));
@@ -983,7 +986,7 @@ llvm::Value *neg_class::code(CgenEnvironment *env)
   if (cgen_debug)
     llvm::errs() << "neg" << '\n';
 
-  llvm::Value *value = e1->code(env);
+  llvm::Value *value = conform(e1->code(env), llvm::Type::getInt32Ty(env->context), env);
   return env->builder.CreateNeg(value);
 }
 
@@ -992,8 +995,8 @@ llvm::Value *lt_class::code(CgenEnvironment *env)
   if (cgen_debug)
     llvm::errs() << "lt" << '\n';
 
-  llvm::Value *left = e1->code(env);
-  llvm::Value *right = e2->code(env);
+  llvm::Value *left = conform(e1->code(env), llvm::Type::getInt32Ty(env->context), env);
+  llvm::Value *right = conform(e2->code(env), llvm::Type::getInt32Ty(env->context), env);
   return env->builder.CreateICmpSLT(left, right);
 }
 
@@ -1002,18 +1005,22 @@ llvm::Value *eq_class::code(CgenEnvironment *env)
   if (cgen_debug)
     llvm::errs() << "eq" << '\n';
 
-  if (e1->type == Int || e1->type == Bool)
-    return env->builder.CreateICmpEQ(e1->code(env), e2->code(env));
-  if (e1->type == String)
+  llvm::Value *left = e1->code(env);
+  llvm::Value *right = e2->code(env);
+  if (e1->type == Int)
+    return env->builder.CreateICmpEQ(conform(left, llvm::Type::getInt32Ty(env->context), env), conform(right, llvm::Type::getInt32Ty(env->context), env));
+  else if (e1->type == Bool)
+    return env->builder.CreateICmpEQ(conform(left, llvm::Type::getInt1Ty(env->context), env), conform(right, llvm::Type::getInt1Ty(env->context), env));
+  else if (e1->type == String)
   {
-    llvm::Value *left = env->builder.CreateStructGEP(env->class_table.get_struct_type(String->get_string()), e1->code(env), 1);
-    llvm::Value *right = env->builder.CreateStructGEP(env->class_table.get_struct_type(String->get_string()), e2->code(env), 1);
+    left = env->builder.CreateStructGEP(env->class_table.get_struct_type(String->get_string()), left, 1);
+    right = env->builder.CreateStructGEP(env->class_table.get_struct_type(String->get_string()), right, 1);
     llvm::Value *value = env->builder.CreateCall(env->the_module.getFunction("strcmp"), {left, right});
     return env->builder.CreateICmpEQ(value, llvm::ConstantInt::get(llvm::Type::getInt32Ty(env->context), 0));
   }
 
-  llvm::Value *left = env->builder.CreatePtrToInt(e1->code(env), llvm::Type::getInt64Ty(env->context));
-  llvm::Value *right = env->builder.CreatePtrToInt(e2->code(env), llvm::Type::getInt64Ty(env->context));
+  left = env->builder.CreatePtrToInt(left, llvm::Type::getInt64Ty(env->context));
+  right = env->builder.CreatePtrToInt(right, llvm::Type::getInt64Ty(env->context));
   return env->builder.CreateICmpEQ(left, right);
 }
 
@@ -1022,8 +1029,8 @@ llvm::Value *leq_class::code(CgenEnvironment *env)
   if (cgen_debug)
     llvm::errs() << "leq" << '\n';
 
-  llvm::Value *left = e1->code(env);
-  llvm::Value *right = e2->code(env);
+  llvm::Value *left = conform(e1->code(env), llvm::Type::getInt32Ty(env->context), env);
+  llvm::Value *right = conform(e2->code(env), llvm::Type::getInt32Ty(env->context), env);
   return env->builder.CreateICmpSLE(left, right);
 }
 
@@ -1032,7 +1039,7 @@ llvm::Value *comp_class::code(CgenEnvironment *env)
   if (cgen_debug)
     llvm::errs() << "complement" << '\n';
 
-  llvm::Value *value = e1->code(env);
+  llvm::Value *value = conform(e1->code(env), llvm::Type::getInt1Ty(env->context), env);
   return env->builder.CreateNot(value);
 }
 
@@ -1205,11 +1212,11 @@ llvm::Type *method_class::layout_feature(CgenNode *cls)
       arg_types.push_back(cls->get_classtable()->get_struct_type(type_decl->get_string())->getPointerTo());
   }
   llvm::Type *ret_type;
-  if (SELF_TYPE == return_type)
+  if (return_type == SELF_TYPE)
     ret_type = cls->get_classtable()->get_struct_type(cls->get_type_name())->getPointerTo();
-  else if (Int == return_type)
+  else if (return_type == Int)
     ret_type = llvm::Type::getInt32Ty(cls->get_classtable()->context);
-  else if (Bool == return_type)
+  else if (return_type == Bool)
     ret_type = llvm::Type::getInt1Ty(cls->get_classtable()->context);
   else
     ret_type = cls->get_classtable()->get_struct_type(return_type->get_string())->getPointerTo();

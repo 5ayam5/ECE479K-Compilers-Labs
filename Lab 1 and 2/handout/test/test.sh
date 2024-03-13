@@ -17,5 +17,6 @@ for file in $dir/*; do
         else
             echo "Test passed: $filename"
         fi
+        echo
     fi
 done
