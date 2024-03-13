@@ -156,7 +156,7 @@ public:
   {
     for (unsigned int i = 0; i < methods.size(); i++)
       if (methods[i].first == name->get_string())
-        return {i + 3, vtable_types[i]};
+        return {i + 3, vtable_types[i + 3]};
     return {-1, nullptr};
   }
   std::string get_method_name(Symbol name)
@@ -265,8 +265,6 @@ public:
 };
 
 #ifdef LAB2
-// TODO: implement these functions (LAB2), and add more functions as necessary
-
 // Utitlity function
 // Generate any code necessary to convert from given Value* to
 // dest_type, assuming it has already been checked to be compatible

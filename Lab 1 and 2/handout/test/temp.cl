@@ -72,17 +72,17 @@ class Main inherits IO
   main() : Bool
   {
     {
-      if c.test() then self.out_string("true\n") else self.out_string("false\n") fi;
-      c.test(); -- TODO: fix this
-      self.out_string("true\n");
-      let x : Int <- in_int() in x; -- TODO: fix this
-      self.out_int(x);
+      if c.test() then out_string("true\n") else out_string("false\n") fi;
+      c.test();
+      out_string("true\n");
+      let x : Int <- 12 in x;
+      out_int(x);
       self;
-      test(c); -- TODO: fix this
-      if c = c then self.out_string("c = c\n") else self.out_string("c != c\n") fi;
-      let x : Int <- 12 in self.out_int(x);
-      if let b : B <- new C in b@B.test() then self.out_string("true\n") else self.out_string("false\n") fi;
-      "c".concat("b") = "a"; -- TODO: fix this
+      test(c);
+      if c = c then out_string("c = c\n") else out_string("c != c\n") fi;
+      let x : Int <- in_int() in out_int(x);
+      if let b : B <- new C in b@B.test() then out_string("true\n") else out_string("false\n") fi;
+      if "c".concat("b") = "a" then out_string("true\n") else out_string("false\n") fi;
       true;
     }
   };
