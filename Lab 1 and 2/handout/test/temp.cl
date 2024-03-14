@@ -82,7 +82,7 @@ class Main inherits IO
       if c = c then out_string("c = c\n") else out_string("c != c\n") fi;
       let x : Int <- 023 in out_int(x);
       if let b : B <- new C in b@B.test() then out_string("true\n") else out_string("false\n") fi;
-      if "c".concat("b") = "a" then out_string("true\n") else out_string("false\n") fi;
+      if "c".concat("b") = "cb" then out_string("true\n") else out_string("false\n") fi;
       true;
     }
   };

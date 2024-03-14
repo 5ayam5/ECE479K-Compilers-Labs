@@ -1025,7 +1025,9 @@ llvm::Value *eq_class::code(CgenEnvironment *env)
   else if (e1->type == String)
   {
     left = env->builder.CreateStructGEP(env->class_table.get_struct_type(String->get_string()), left, 1);
+    left = env->builder.CreateLoad(llvm::Type::getInt8PtrTy(env->context), left);
     right = env->builder.CreateStructGEP(env->class_table.get_struct_type(String->get_string()), right, 1);
+    right = env->builder.CreateLoad(llvm::Type::getInt8PtrTy(env->context), right);
     llvm::Value *value = env->builder.CreateCall(env->the_module.getFunction("strcmp"), {left, right});
     return env->builder.CreateICmpEQ(value, llvm::ConstantInt::get(llvm::Type::getInt32Ty(env->context), 0));
   }
@@ -1205,7 +1207,7 @@ llvm::Value *typcase_class::code(CgenEnvironment *env)
   std::string vtable_type_name = cls->get_vtable_type_name();
   llvm::Value *vtable = env->builder.CreateLoad(env->class_table.get_struct_type(vtable_type_name)->getPointerTo(), vtable_ptr);
   llvm::Value *tag = env->builder.CreateLoad(llvm::Type::getInt32Ty(env->context), env->builder.CreateStructGEP(env->class_table.get_struct_type(vtable_type_name), vtable, 0));
-  llvm::PointerType *join_type = env->class_table.get_struct_type(this->type->get_string())->getPointerTo();
+  llvm::Type *join_type = env->class_table.get_struct_type(this->type->get_string())->getPointerTo();
 
   llvm::BasicBlock *exit_bb = llvm::BasicBlock::Create(env->context, "exit");
   std::vector<llvm::BasicBlock *> case_bbs;
@@ -1227,7 +1229,7 @@ llvm::Value *typcase_class::code(CgenEnvironment *env)
   llvm::PHINode *phi_node = env->builder.CreatePHI(join_type, case_bbs.size(), "casertmp");
   for (unsigned int i = 0; i < case_bbs.size(); i++)
     phi_node->addIncoming(case_values[i], case_bbs[i]);
-  return phi_node;
+  return conform(phi_node, env->class_table.get_struct_type(this->type->get_string()), env);
 #endif
 }
 
