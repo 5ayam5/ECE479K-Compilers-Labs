@@ -4,3 +4,6 @@ cgen-2
 *.ll
 *.bin
 *.out
+handout/test/grading
+handout/test/examples
+handout/test/input_output

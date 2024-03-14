@@ -11,7 +11,6 @@ for file in $dir/*; do
         make $dir/$filename.out > /dev/null 2>&1
         if [ $? -ne 0 ]; then
             echo "Test failed build: $filename"
-            echo
             continue
         fi
         # compare the output with the expected output
