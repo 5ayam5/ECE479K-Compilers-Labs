@@ -1077,6 +1077,21 @@ llvm::Value *static_dispatch_class::code(CgenEnvironment *env)
 #ifndef LAB2
   assert(0 && "Unsupported case for phase 1");
 #else
+  CgenNode *cls = env->type_to_class(type_name);
+  llvm::Value *vtable = env->the_module.getNamedGlobal(cls->get_vtable_name());
+  auto [index, method_type] = cls->get_method_offset_and_type(name);
+  llvm::Value *method_ptr = env->builder.CreateStructGEP(env->class_table.get_struct_type(cls->get_vtable_type_name()), vtable, index);
+  llvm::Value *method = env->builder.CreateLoad(method_type, method_ptr);
+  std::string method_name = cls->get_method_name(name);
+
+  std::vector<llvm::Value *> args;
+  args.push_back(nullptr);
+  for (int i = actual->first(); actual->more(i); i = actual->next(i))
+  {
+    auto arg = actual->nth(i);
+    args.push_back(conform(arg->code(env), env->class_table.get_struct_type(env->type_to_class(arg->get_type())->get_type_name()), env));
+  }
+
   llvm::Value *value = expr->code(env);
   value = conform(value, env->class_table.get_struct_type(type_name->get_string())->getPointerTo(), env);
 
@@ -1086,20 +1101,12 @@ llvm::Value *static_dispatch_class::code(CgenEnvironment *env)
   llvm::BasicBlock *cont_bb = env->new_bb_at_fend("cont");
   env->builder.CreateCondBr(cmp, abort_bb, cont_bb);
   env->builder.SetInsertPoint(cont_bb);
-
-  std::string method_name = concat_method_name(env->type_to_class(type_name), name);
-  llvm::Function *func = env->the_module.getFunction(method_name);
-  std::vector<llvm::Value *> args;
-  args.push_back(value);
-  for (int i = actual->first(); actual->more(i); i = actual->next(i))
-  {
-    auto arg = actual->nth(i);
-    args.push_back(conform(arg->code(env), env->class_table.get_struct_type(env->type_to_class(arg->get_type())->get_type_name()), env));
-  }
+  args[0] = value;
 
   if (cgen_debug)
     llvm::errs() << "Calling function @" << method_name << '\n';
-  return conform(env->builder.CreateCall(func, args), env->class_table.get_struct_type(env->type_to_class(this->get_type())->get_type_name()), env);
+  llvm::FunctionType *function_type = env->the_module.getFunction(method_name)->getFunctionType();
+  return conform(env->builder.CreateCall(function_type, method, args), env->class_table.get_struct_type(env->type_to_class(this->get_type())->get_type_name()), env);
 #endif
 }
 
@@ -1121,6 +1128,14 @@ llvm::Value *dispatch_class::code(CgenEnvironment *env)
 #ifndef LAB2
   assert(0 && "Unsupported case for phase 1");
 #else
+  std::vector<llvm::Value *> args;
+  args.push_back(nullptr);
+  for (int i = actual->first(); actual->more(i); i = actual->next(i))
+  {
+    auto arg = actual->nth(i);
+    args.push_back(conform(arg->code(env), env->class_table.get_struct_type(env->type_to_class(arg->get_type())->get_type_name()), env));
+  }
+
   CgenNode *cls = env->type_to_class(expr->get_type());
   llvm::Value *value = expr->code(env);
   value = conform(value, env->class_table.get_struct_type(cls->get_type_name())->getPointerTo(), env);
@@ -1131,6 +1146,7 @@ llvm::Value *dispatch_class::code(CgenEnvironment *env)
   llvm::BasicBlock *cont_bb = env->new_bb_at_fend("cont");
   env->builder.CreateCondBr(cmp, abort_bb, cont_bb);
   env->builder.SetInsertPoint(cont_bb);
+  args[0] = value;
 
   llvm::Value *vtable_ptr = env->builder.CreateStructGEP(env->class_table.get_struct_type(cls->get_name()->get_string()), value, 0);
   std::string vtable_type_name = cls->get_vtable_type_name();
@@ -1138,14 +1154,6 @@ llvm::Value *dispatch_class::code(CgenEnvironment *env)
   auto [index, method_type] = env->type_to_class(expr->get_type())->get_method_offset_and_type(name);
   llvm::Value *method_ptr = env->builder.CreateStructGEP(env->class_table.get_struct_type(vtable_type_name), vtable, index);
   llvm::Value *method = env->builder.CreateLoad(method_type, method_ptr);
-
-  std::vector<llvm::Value *> args;
-  args.push_back(value);
-  for (int i = actual->first(); actual->more(i); i = actual->next(i))
-  {
-    auto arg = actual->nth(i);
-    args.push_back(conform(arg->code(env), env->class_table.get_struct_type(env->type_to_class(arg->get_type())->get_type_name()), env));
-  }
 
   std::string method_name = cls->get_method_name(name);
   if (cgen_debug)
@@ -1168,7 +1176,7 @@ llvm::Value *typcase_class::code(CgenEnvironment *env)
 
   llvm::Function *func = env->builder.GetInsertBlock()->getParent();
   llvm::BasicBlock *abort_bb = env->get_or_insert_abort_block(func);
-  llvm::Value *cmp = env->builder.CreateICmpEQ(value, llvm::Constant::getNullValue(env->class_table.get_struct_type(expr->get_type()->get_string())->getPointerTo()));
+  llvm::Value *cmp = env->builder.CreateICmpEQ(env->builder.CreatePtrToInt(value, llvm::Type::getInt32Ty(env->context)), llvm::ConstantInt::get(llvm::Type::getInt32Ty(env->context), 0));
   llvm::BasicBlock *cont_bb = env->new_bb_at_fend("cont");
   env->builder.CreateCondBr(cmp, abort_bb, cont_bb);
   env->builder.SetInsertPoint(cont_bb);
@@ -1211,7 +1219,7 @@ llvm::Value *new__class::code(CgenEnvironment *env)
   assert(0 && "Unsupported case for phase 1");
 #else
   llvm::Function *init_function = env->the_module.getFunction(env->type_to_class(type_name)->get_init_function_name());
-  return env->builder.CreateCall(init_function, {});
+  return conform(env->builder.CreateCall(init_function, {}), env->class_table.get_struct_type(type_name->get_string()), env);
 #endif
 }
 
@@ -1339,9 +1347,14 @@ llvm::Value *attr_class::code(CgenEnvironment *env)
 llvm::Value *conform(llvm::Value *src, llvm::Type *dest_type, CgenEnvironment *env)
 {
   if (src->getType() == dest_type)
+  {
+    if (cgen_debug)
+      llvm::errs() << "Already equal" << '\n';
     return src;
+  }
   llvm::StructType *Int_type = env->class_table.get_struct_type(Int->get_string());
   llvm::StructType *Bool_type = env->class_table.get_struct_type(Bool->get_string());
+
   if (src->getType() == llvm::Type::getInt32Ty(env->context) && dest_type != Int_type)
   {
     if (cgen_debug)
@@ -1372,7 +1385,7 @@ llvm::Value *conform(llvm::Value *src, llvm::Type *dest_type, CgenEnvironment *e
     return env->builder.CreateLoad(llvm::Type::getInt32Ty(env->context), int_ptr);
   }
 
-  if (src->getType()->isPointerTy() && (dest_type == llvm::Type::getInt1Ty(env->context) || dest_type == Int_type))
+  if (src->getType()->isPointerTy() && (dest_type == llvm::Type::getInt1Ty(env->context) || dest_type == Bool_type))
   {
     if (cgen_debug)
       llvm::errs() << "Unboxing bool" << '\n';
@@ -1380,6 +1393,8 @@ llvm::Value *conform(llvm::Value *src, llvm::Type *dest_type, CgenEnvironment *e
     return env->builder.CreateLoad(llvm::Type::getInt1Ty(env->context), bool_ptr);
   }
 
+  if (cgen_debug)
+    llvm::errs() << "No need to conform" << '\n';
   return src;
 }
 #endif

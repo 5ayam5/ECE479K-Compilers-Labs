@@ -62,4 +62,4 @@ cgen-2:
 	diff -u $< $(<:%.out=%.refout)
 
 clean:
-	-rm -f *.bin **/*.bin *.ll **/*.ll *.out **/*.out *.ast **/*.ast *.verify **/*.verify
+	-rm -f *.bin **/*.bin *.ll **/*.ll *.ast **/*.ast *.verify **/*.verify
