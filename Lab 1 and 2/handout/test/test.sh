@@ -9,6 +9,11 @@ for file in $dir/*; do
         echo "Testing $filename"
         # run the file
         make $dir/$filename.out > /dev/null 2>&1
+        if [ $? -ne 0 ]; then
+            echo "Test failed: $filename"
+            echo
+            continue
+        fi
         # compare the output with the expected output
         diff $dir/$filename.refout $dir/$filename.out > /dev/null 2>&1
         # if the output is different, print the file name

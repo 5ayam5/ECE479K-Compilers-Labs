@@ -101,7 +101,8 @@ typedef Cases_class *Cases;
 #define Case_EXTRAS                                                            \
   virtual Symbol get_type_decl() = 0;                                          \
   virtual llvm::Value *code(llvm::Value *, llvm::Value *, llvm::Type *,        \
-                            CgenEnvironment *) = 0;                            \
+                            CgenEnvironment *,                                 \
+                            llvm::BasicBlock *, llvm::BasicBlock *&) = 0;      \
   virtual void dump_with_types(std::ostream &, int) = 0;
 
 #define branch_EXTRAS                                                          \
@@ -109,7 +110,8 @@ typedef Cases_class *Cases;
   Expression get_expr() { return expr; }                                       \
   llvm::Value *alloca_op;                                                      \
   llvm::Value *code(llvm::Value *expr_val, llvm::Value *tag,                   \
-                    llvm::Type *join_type, CgenEnvironment *env);              \
+                    llvm::Type *join_type, CgenEnvironment *env,               \
+                    llvm::BasicBlock *exit_bb, llvm::BasicBlock *&last_bb);    \
   void dump_with_types(std::ostream &, int);
 
 #define Expression_SHARED_EXTRAS                                               \

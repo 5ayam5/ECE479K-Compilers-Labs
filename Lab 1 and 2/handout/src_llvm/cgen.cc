@@ -544,6 +544,7 @@ void CgenNode::layout_features()
   llvm::StructType *struct_type = this->get_classtable()->get_struct_type(this->get_type_name());
   std::vector<llvm::Type *> struct_types;
   struct_types.push_back(llvm::Type::getInt8PtrTy(this->env->context));
+  Features_class *self_attrs = Features_class::nil();
   int num_attributes = the_module.getDataLayout().getTypeAllocSize(struct_types.back()), index = 1;
   for (auto feature : this->features)
     if (auto attr = dynamic_cast<attr_class *>(feature))
@@ -554,9 +555,10 @@ void CgenNode::layout_features()
       num_attributes += the_module.getDataLayout().getTypeAllocSize(attr_type);
       if (cgen_debug)
         llvm::errs() << "Attribute " << attr->get_name()->get_string() << " has been added to the struct\n";
-      for (auto child : this->get_children())
-        child->features = Features_class::append(Features_class::single(attr), child->features);
+      self_attrs = Features_class::append(self_attrs, Features_class::single(attr));
     }
+  for (auto child : this->get_children())
+    child->features = Features_class::append(self_attrs, child->features);
   struct_type->setBody(struct_types);
 
   this->methods = this->parentnd->methods;
@@ -630,6 +632,21 @@ void CgenNode::code_init_function(CgenEnvironment *env)
   llvm::Value *vtable = env->the_module.getNamedGlobal(this->get_vtable_name());
   llvm::Value *vtable_ptr = env->builder.CreateStructGEP(struct_type, obj, 0);
   env->builder.CreateStore(vtable, vtable_ptr);
+
+  env->open_scope();
+  llvm::AllocaInst *self_alloca = env->builder.CreateAlloca(obj->getType());
+  env->builder.CreateStore(obj, self_alloca);
+  env->add_binding(self, self_alloca, self_alloca->getAllocatedType());
+  llvm::Value *self_obj = env->builder.CreateLoad(obj->getType(), self_alloca);
+  for (auto feature : env->get_class()->get_features())
+    if (auto attr = dynamic_cast<attr_class *>(feature))
+    {
+      auto attr_name = attr->get_name();
+      auto [attr_index, attr_type] = env->get_class()->get_layed_out_attr(attr_name);
+      llvm::Value *attr_ptr = env->builder.CreateStructGEP(env->class_table.get_struct_type(env->get_class()->get_type_name()), self_obj, attr_index);
+      env->add_binding(attr_name, attr_ptr, attr_type);
+    }
+
   for (auto feature : this->features)
     if (auto attr = dynamic_cast<attr_class *>(feature))
     {
@@ -639,6 +656,7 @@ void CgenNode::code_init_function(CgenEnvironment *env)
     }
 
   env->builder.CreateRet(obj);
+  env->close_scope();
 }
 
 #else
@@ -752,18 +770,15 @@ llvm::Function *method_class::code(CgenEnvironment *env)
   auto arg = func->getArg(0);
   llvm::AllocaInst *self_alloca = env->builder.CreateAlloca(arg->getType());
   env->builder.CreateStore(arg, self_alloca);
-  env->add_binding(self, self_alloca);
+  env->add_binding(self, self_alloca, self_alloca->getAllocatedType());
   llvm::Value *self_obj = env->builder.CreateLoad(arg->getType(), self_alloca);
   for (auto feature : env->get_class()->get_features())
     if (auto attr = dynamic_cast<attr_class *>(feature))
     {
       auto attr_name = attr->get_name();
       auto [attr_index, attr_type] = env->get_class()->get_layed_out_attr(attr_name);
-      llvm::AllocaInst *alloca = env->builder.CreateAlloca(attr_type);
       llvm::Value *attr_ptr = env->builder.CreateStructGEP(env->class_table.get_struct_type(env->get_class()->get_type_name()), self_obj, attr_index);
-      llvm::Value *attr_obj = env->builder.CreateLoad(attr_type, attr_ptr);
-      env->builder.CreateStore(attr_obj, alloca);
-      env->add_binding(attr_name, alloca);
+      env->add_binding(attr_name, attr_ptr, attr_type);
     }
 
   env->open_scope();
@@ -772,7 +787,7 @@ llvm::Function *method_class::code(CgenEnvironment *env)
     arg = func->getArg(i + 1);
     llvm::AllocaInst *alloca = env->builder.CreateAlloca(arg->getType());
     env->builder.CreateStore(arg, alloca);
-    env->add_binding(formals->nth(i)->get_name(), alloca);
+    env->add_binding(formals->nth(i)->get_name(), alloca, alloca->getAllocatedType());
   }
 #endif
 
@@ -782,12 +797,7 @@ llvm::Function *method_class::code(CgenEnvironment *env)
   env->close_scope();
   env->close_scope();
   Symbol ret_type = return_type == SELF_TYPE ? env->get_class()->get_name() : return_type;
-  if (ret_type == Int)
-    value = conform(value, llvm::Type::getInt32Ty(env->context), env);
-  else if (ret_type == Bool)
-    value = conform(value, llvm::Type::getInt1Ty(env->context), env);
-  else
-    value = conform(value, env->class_table.get_struct_type(ret_type->get_string()), env);
+  value = conform(value, env->class_table.get_struct_type(ret_type->get_string()), env);
 #endif
   env->builder.CreateRet(value);
   return func;
@@ -800,8 +810,11 @@ llvm::Value *assign_class::code(CgenEnvironment *env)
   if (cgen_debug)
     llvm::errs() << "assign" << '\n';
 
-  llvm::Value *value = conform(expr->code(env), env->find_in_scopes(name)->getAllocatedType(), env);
-  env->builder.CreateStore(value, env->find_in_scopes(name));
+  llvm::Value *value = expr->code(env);
+#ifdef LAB2
+  value = conform(value, env->find_in_scopes(name).second, env);
+#endif
+  env->builder.CreateStore(value, env->find_in_scopes(name).first);
   return value;
 }
 
@@ -828,7 +841,7 @@ llvm::Value *cond_class::code(CgenEnvironment *env)
   env->builder.SetInsertPoint(then_bb);
   llvm::Value *then_value = then_exp->code(env);
   if (else_exp->get_type() != then_exp->get_type())
-    then_value = conform(then_value, env->class_table.get_struct_type(Object->get_string())->getPointerTo(), env);
+    then_value = conform(then_value, env->class_table.get_struct_type(Object->get_string()), env);
   env->builder.CreateBr(merge_bb);
   then_bb = env->builder.GetInsertBlock();
 
@@ -837,14 +850,14 @@ llvm::Value *cond_class::code(CgenEnvironment *env)
   env->builder.SetInsertPoint(else_bb);
   llvm::Value *else_value = else_exp->code(env);
   if (else_exp->get_type() != then_exp->get_type())
-    else_value = conform(else_value, env->class_table.get_struct_type(Object->get_string())->getPointerTo(), env);
+    else_value = conform(else_value, env->class_table.get_struct_type(Object->get_string()), env);
   env->builder.CreateBr(merge_bb);
   else_bb = env->builder.GetInsertBlock();
 
   // emit code for the merge block
   func->getBasicBlockList().push_back(merge_bb);
   env->builder.SetInsertPoint(merge_bb);
-  llvm::PHINode *phi_node = env->builder.CreatePHI(then_value->getType(), 2, "iftmp"); // TODO: change this for Lab 2
+  llvm::PHINode *phi_node = env->builder.CreatePHI(then_value->getType(), 2, "iftmp");
   phi_node->addIncoming(then_value, then_bb);
   phi_node->addIncoming(else_value, else_bb);
 
@@ -925,7 +938,7 @@ llvm::Value *let_class::code(CgenEnvironment *env)
 
   llvm::AllocaInst *alloca = env->builder.CreateAlloca(init_value->getType());
   env->builder.CreateStore(init_value, alloca);
-  env->add_binding(identifier, alloca);
+  env->add_binding(identifier, alloca, alloca->getAllocatedType());
   llvm::Value *value = body->code(env);
 
   env->close_scope();
@@ -937,8 +950,8 @@ llvm::Value *plus_class::code(CgenEnvironment *env)
   if (cgen_debug)
     llvm::errs() << "plus" << '\n';
 
-  llvm::Value *left = conform(e1->code(env), llvm::Type::getInt32Ty(env->context), env);
-  llvm::Value *right = conform(e2->code(env), llvm::Type::getInt32Ty(env->context), env);
+  llvm::Value *left = e1->code(env);
+  llvm::Value *right = e2->code(env);
   return env->builder.CreateAdd(left, right);
 }
 
@@ -947,8 +960,8 @@ llvm::Value *sub_class::code(CgenEnvironment *env)
   if (cgen_debug)
     llvm::errs() << "sub" << '\n';
 
-  llvm::Value *left = conform(e1->code(env), llvm::Type::getInt32Ty(env->context), env);
-  llvm::Value *right = conform(e2->code(env), llvm::Type::getInt32Ty(env->context), env);
+  llvm::Value *left = e1->code(env);
+  llvm::Value *right = e2->code(env);
   return env->builder.CreateSub(left, right);
 }
 
@@ -957,8 +970,8 @@ llvm::Value *mul_class::code(CgenEnvironment *env)
   if (cgen_debug)
     llvm::errs() << "mul" << '\n';
 
-  llvm::Value *left = conform(e1->code(env), llvm::Type::getInt32Ty(env->context), env);
-  llvm::Value *right = conform(e2->code(env), llvm::Type::getInt32Ty(env->context), env);
+  llvm::Value *left = e1->code(env);
+  llvm::Value *right = e2->code(env);
   return env->builder.CreateMul(left, right);
 }
 
@@ -967,8 +980,8 @@ llvm::Value *divide_class::code(CgenEnvironment *env)
   if (cgen_debug)
     llvm::errs() << "div" << '\n';
 
-  llvm::Value *left = conform(e1->code(env), llvm::Type::getInt32Ty(env->context), env);
-  llvm::Value *right = conform(e2->code(env), llvm::Type::getInt32Ty(env->context), env);
+  llvm::Value *left = e1->code(env);
+  llvm::Value *right = e2->code(env);
 
   // check if right is zero
   llvm::Value *cmp = env->builder.CreateICmpEQ(right, llvm::ConstantInt::get(llvm::Type::getInt32Ty(env->context), 0));
@@ -986,7 +999,7 @@ llvm::Value *neg_class::code(CgenEnvironment *env)
   if (cgen_debug)
     llvm::errs() << "neg" << '\n';
 
-  llvm::Value *value = conform(e1->code(env), llvm::Type::getInt32Ty(env->context), env);
+  llvm::Value *value = e1->code(env);
   return env->builder.CreateNeg(value);
 }
 
@@ -995,8 +1008,8 @@ llvm::Value *lt_class::code(CgenEnvironment *env)
   if (cgen_debug)
     llvm::errs() << "lt" << '\n';
 
-  llvm::Value *left = conform(e1->code(env), llvm::Type::getInt32Ty(env->context), env);
-  llvm::Value *right = conform(e2->code(env), llvm::Type::getInt32Ty(env->context), env);
+  llvm::Value *left = e1->code(env);
+  llvm::Value *right = e2->code(env);
   return env->builder.CreateICmpSLT(left, right);
 }
 
@@ -1007,10 +1020,8 @@ llvm::Value *eq_class::code(CgenEnvironment *env)
 
   llvm::Value *left = e1->code(env);
   llvm::Value *right = e2->code(env);
-  if (e1->type == Int)
-    return env->builder.CreateICmpEQ(conform(left, llvm::Type::getInt32Ty(env->context), env), conform(right, llvm::Type::getInt32Ty(env->context), env));
-  else if (e1->type == Bool)
-    return env->builder.CreateICmpEQ(conform(left, llvm::Type::getInt1Ty(env->context), env), conform(right, llvm::Type::getInt1Ty(env->context), env));
+  if (e1->type == Int || e1->type == Bool)
+    return env->builder.CreateICmpEQ(left, right);
   else if (e1->type == String)
   {
     left = env->builder.CreateStructGEP(env->class_table.get_struct_type(String->get_string()), left, 1);
@@ -1029,8 +1040,8 @@ llvm::Value *leq_class::code(CgenEnvironment *env)
   if (cgen_debug)
     llvm::errs() << "leq" << '\n';
 
-  llvm::Value *left = conform(e1->code(env), llvm::Type::getInt32Ty(env->context), env);
-  llvm::Value *right = conform(e2->code(env), llvm::Type::getInt32Ty(env->context), env);
+  llvm::Value *left = e1->code(env);
+  llvm::Value *right = e2->code(env);
   return env->builder.CreateICmpSLE(left, right);
 }
 
@@ -1039,7 +1050,7 @@ llvm::Value *comp_class::code(CgenEnvironment *env)
   if (cgen_debug)
     llvm::errs() << "complement" << '\n';
 
-  llvm::Value *value = conform(e1->code(env), llvm::Type::getInt1Ty(env->context), env);
+  llvm::Value *value = e1->code(env);
   return env->builder.CreateNot(value);
 }
 
@@ -1064,8 +1075,8 @@ llvm::Value *object_class::code(CgenEnvironment *env)
   if (cgen_debug)
     llvm::errs() << "Object" << '\n';
 
-  llvm::AllocaInst *alloca = env->find_in_scopes(name);
-  return env->builder.CreateLoad(alloca->getAllocatedType(), alloca);
+  auto [address, type] = env->find_in_scopes(name);
+  return env->builder.CreateLoad(type, address);
 }
 
 llvm::Value *no_expr_class::code(CgenEnvironment *env)
@@ -1091,6 +1102,12 @@ llvm::Value *static_dispatch_class::code(CgenEnvironment *env)
 #else
   llvm::Value *value = expr->code(env);
   value = conform(value, env->class_table.get_struct_type(type_name->get_string())->getPointerTo(), env);
+  llvm::Value *cmp = env->builder.CreateICmpEQ(value, llvm::ConstantPointerNull::get(env->class_table.get_struct_type(expr->get_type()->get_string())->getPointerTo()));
+  llvm::Function *parent_func = env->builder.GetInsertBlock()->getParent();
+  llvm::BasicBlock *abort_bb = env->get_or_insert_abort_block(parent_func);
+  llvm::BasicBlock *cont_bb = env->new_bb_at_fend("cont");
+  env->builder.CreateCondBr(cmp, abort_bb, cont_bb);
+  env->builder.SetInsertPoint(cont_bb);
 
   std::string method_name = concat_method_name(env->type_to_class(type_name), name);
   llvm::Function *func = env->the_module.getFunction(method_name);
@@ -1101,7 +1118,9 @@ llvm::Value *static_dispatch_class::code(CgenEnvironment *env)
 
   if (cgen_debug)
     llvm::errs() << "Calling function @" << method_name << '\n';
-  return env->builder.CreateCall(func, args);
+  llvm::Value *ret = env->builder.CreateCall(func, args);
+  Symbol ret_type = this->get_type() == SELF_TYPE ? (expr->get_type() == SELF_TYPE ? env->get_class()->get_name() : expr->get_type()) : this->get_type();
+  return conform(ret, env->class_table.get_struct_type(ret_type->get_string()), env);
 #endif
 }
 
@@ -1131,6 +1150,12 @@ llvm::Value *dispatch_class::code(CgenEnvironment *env)
 
   llvm::Value *value = expr->code(env);
   value = conform(value, env->class_table.get_struct_type(cls->get_type_name())->getPointerTo(), env);
+  llvm::Value *cmp = env->builder.CreateICmpEQ(value, llvm::ConstantPointerNull::get(env->class_table.get_struct_type(expr->get_type()->get_string())->getPointerTo()));
+  llvm::Function *parent_func = env->builder.GetInsertBlock()->getParent();
+  llvm::BasicBlock *abort_bb = env->get_or_insert_abort_block(parent_func);
+  llvm::BasicBlock *cont_bb = env->new_bb_at_fend("cont");
+  env->builder.CreateCondBr(cmp, abort_bb, cont_bb);
+  env->builder.SetInsertPoint(cont_bb);
 
   llvm::Value *vtable_ptr = env->builder.CreateStructGEP(env->class_table.get_struct_type(cls->get_name()->get_string()), value, 0);
   std::string vtable_type_name = cls->get_vtable_type_name();
@@ -1148,7 +1173,9 @@ llvm::Value *dispatch_class::code(CgenEnvironment *env)
   if (cgen_debug)
     llvm::errs() << "Calling function " << method_name << '\n';
   llvm::FunctionType *function_type = env->the_module.getFunction(method_name)->getFunctionType();
-  return env->builder.CreateCall(function_type, method, args);
+  llvm::Value *ret = env->builder.CreateCall(function_type, method, args);
+  Symbol ret_type = this->get_type() == SELF_TYPE ? cls->get_name() : this->get_type();
+  return conform(ret, env->class_table.get_struct_type(ret_type->get_string()), env);
 #endif
 }
 
@@ -1160,8 +1187,47 @@ llvm::Value *typcase_class::code(CgenEnvironment *env)
 #ifndef LAB2
   assert(0 && "Unsupported case for phase 1");
 #else
-  // TODO: add code here and replace `return nullptr`
-  return nullptr;
+  CgenNode *cls;
+  if (expr->get_type() == SELF_TYPE)
+    cls = env->get_class();
+  else
+    cls = env->type_to_class(this->expr->get_type());
+  llvm::Value *value = conform(expr->code(env), env->class_table.get_struct_type(cls->get_type_name())->getPointerTo(), env);
+
+  llvm::Function *func = env->builder.GetInsertBlock()->getParent();
+  llvm::BasicBlock *abort_bb = env->get_or_insert_abort_block(func);
+  llvm::Value *cmp = env->builder.CreateICmpEQ(value, llvm::ConstantPointerNull::get(env->class_table.get_struct_type(expr->get_type()->get_string())->getPointerTo()));
+  llvm::BasicBlock *cont_bb = env->new_bb_at_fend("cont");
+  env->builder.CreateCondBr(cmp, abort_bb, cont_bb);
+  env->builder.SetInsertPoint(cont_bb);
+
+  llvm::Value *vtable_ptr = env->builder.CreateStructGEP(env->class_table.get_struct_type(cls->get_name()->get_string()), value, 0);
+  std::string vtable_type_name = cls->get_vtable_type_name();
+  llvm::Value *vtable = env->builder.CreateLoad(env->class_table.get_struct_type(vtable_type_name)->getPointerTo(), vtable_ptr);
+  llvm::Value *tag = env->builder.CreateLoad(llvm::Type::getInt32Ty(env->context), env->builder.CreateStructGEP(env->class_table.get_struct_type(vtable_type_name), vtable, 0));
+  llvm::PointerType *join_type = env->class_table.get_struct_type(this->type->get_string())->getPointerTo();
+
+  llvm::BasicBlock *exit_bb = llvm::BasicBlock::Create(env->context, "exit");
+  std::vector<llvm::BasicBlock *> case_bbs;
+  std::vector<llvm::Value *> case_values;
+  for (int i = env->class_table.get_num_classes() - 1; i >= 0; i--)
+    for (auto case_branch : cases)
+      if (i == env->class_table.find_in_scopes(case_branch->get_type_decl())->get_tag())
+      {
+        llvm::BasicBlock *case_bb = llvm::BasicBlock::Create(env->context, "case", func);
+        env->builder.CreateBr(case_bb);
+        env->builder.SetInsertPoint(case_bb);
+        case_values.push_back(case_branch->code(value, tag, join_type, env, exit_bb, case_bb));
+        case_bbs.push_back(case_bb);
+      }
+  env->builder.CreateBr(abort_bb);
+
+  func->getBasicBlockList().push_back(exit_bb);
+  env->builder.SetInsertPoint(exit_bb);
+  llvm::PHINode *phi_node = env->builder.CreatePHI(join_type, case_bbs.size(), "casertmp");
+  for (unsigned int i = 0; i < case_bbs.size(); i++)
+    phi_node->addIncoming(case_values[i], case_bbs[i]);
+  return phi_node;
 #endif
 }
 
@@ -1184,8 +1250,8 @@ llvm::Value *isvoid_class::code(CgenEnvironment *env)
 #ifndef LAB2
   assert(0 && "Unsupported case for phase 1");
 #else
-  // TODO: add code here and replace `return nullptr`
-  return nullptr;
+  llvm::Value *value = conform(e1->code(env), env->class_table.get_struct_type(Object->get_string()), env);
+  return env->builder.CreateICmpEQ(value, llvm::ConstantPointerNull::get(env->class_table.get_struct_type(e1->get_type()->get_string())->getPointerTo()));
 #endif
 }
 
@@ -1236,13 +1302,31 @@ llvm::Type *method_class::layout_feature(CgenNode *cls)
 // then the branch is a superclass of the source.
 // See the LAB2 handout for more information about our use of class tags.
 llvm::Value *branch_class::code(llvm::Value *expr_val, llvm::Value *tag, llvm::Type *join_type,
-                                CgenEnvironment *env)
+                                CgenEnvironment *env, llvm::BasicBlock *exit_bb, llvm::BasicBlock *&last_bb)
 {
 #ifndef LAB2
   assert(0 && "Unsupported case for phase 1");
 #else
-  // TODO: add code here and replace `return nullptr`
-  return nullptr;
+  CgenNode *cls = env->class_table.find_in_scopes(type_decl);
+  llvm::Value *cmp1 = env->builder.CreateICmpSGE(tag, llvm::ConstantInt::get(llvm::Type::getInt32Ty(env->context), cls->get_tag()));
+  llvm::Value *cmp2 = env->builder.CreateICmpSLE(tag, llvm::ConstantInt::get(llvm::Type::getInt32Ty(env->context), cls->get_max_child()));
+  llvm::Value *cmp = env->builder.CreateAnd(cmp1, cmp2);
+  llvm::BasicBlock *cont_bb = env->new_bb_at_fend("cont");
+  llvm::BasicBlock *next_bb = env->new_bb_at_fend("next");
+  env->builder.CreateCondBr(cmp, cont_bb, next_bb);
+
+  env->builder.SetInsertPoint(cont_bb);
+  env->open_scope();
+  expr_val = conform(expr_val, env->class_table.get_struct_type(type_decl->get_string()), env);
+  llvm::AllocaInst *alloca = env->builder.CreateAlloca(expr_val->getType());
+  env->builder.CreateStore(expr_val, alloca);
+  env->add_binding(name, alloca, alloca->getAllocatedType());
+  llvm::Value *value = conform(expr->code(env), join_type, env);
+  env->close_scope();
+  env->builder.CreateBr(exit_bb);
+  last_bb = env->builder.GetInsertBlock();
+  env->builder.SetInsertPoint(next_bb);
+  return value;
 #endif
 }
 
@@ -1291,36 +1375,45 @@ llvm::Value *attr_class::code(CgenEnvironment *env)
 #ifdef LAB2
 llvm::Value *conform(llvm::Value *src, llvm::Type *dest_type, CgenEnvironment *env)
 {
-  if ((src->getType()->isPointerTy() ^ dest_type->isPointerTy()) == 0)
+  if (src->getType() == dest_type)
     return src;
-
-  if (src->getType() == llvm::Type::getInt32Ty(env->context))
+  llvm::StructType *Int_type = env->class_table.get_struct_type(Int->get_string());
+  llvm::StructType *Bool_type = env->class_table.get_struct_type(Bool->get_string());
+  if (src->getType() == llvm::Type::getInt32Ty(env->context) && (dest_type->isPointerTy() || dest_type != Int_type))
   {
+    if (cgen_debug)
+      llvm::errs() << "Boxing int" << '\n';
     llvm::Function *int_new = env->the_module.getFunction("Int_new");
     llvm::Value *int_obj = env->builder.CreateCall(int_new, {});
-    llvm::Value *int_ptr = env->builder.CreateStructGEP(env->class_table.get_struct_type(Int->get_string()), int_obj, 1);
+    llvm::Value *int_ptr = env->builder.CreateStructGEP(Int_type, int_obj, 1);
     env->builder.CreateStore(src, int_ptr);
     return int_obj;
   }
 
-  if (src->getType() == llvm::Type::getInt1Ty(env->context))
+  if (src->getType() == llvm::Type::getInt1Ty(env->context) && (dest_type->isPointerTy() || dest_type != Bool_type))
   {
+    if (cgen_debug)
+      llvm::errs() << "Boxing bool" << '\n';
     llvm::Function *bool_new = env->the_module.getFunction("Bool_new");
     llvm::Value *bool_obj = env->builder.CreateCall(bool_new, {});
-    llvm::Value *bool_ptr = env->builder.CreateStructGEP(env->class_table.get_struct_type(Bool->get_string()), bool_obj, 1);
+    llvm::Value *bool_ptr = env->builder.CreateStructGEP(Bool_type, bool_obj, 1);
     env->builder.CreateStore(src, bool_ptr);
     return bool_obj;
   }
 
-  if (dest_type == llvm::Type::getInt32Ty(env->context))
+  if (src->getType()->isPointerTy() && (dest_type == llvm::Type::getInt32Ty(env->context) || dest_type == Int_type))
   {
-    llvm::Value *int_ptr = env->builder.CreateStructGEP(env->class_table.get_struct_type(Int->get_string()), src, 1);
+    if (cgen_debug)
+      llvm::errs() << "Unboxing int" << '\n';
+    llvm::Value *int_ptr = env->builder.CreateStructGEP(Int_type, src, 1);
     return env->builder.CreateLoad(llvm::Type::getInt32Ty(env->context), int_ptr);
   }
 
-  if (dest_type == llvm::Type::getInt1Ty(env->context))
+  if (src->getType()->isPointerTy() && (dest_type == llvm::Type::getInt1Ty(env->context) || dest_type == Int_type))
   {
-    llvm::Value *bool_ptr = env->builder.CreateStructGEP(env->class_table.get_struct_type(Bool->get_string()), src, 1);
+    if (cgen_debug)
+      llvm::errs() << "Unboxing bool" << '\n';
+    llvm::Value *bool_ptr = env->builder.CreateStructGEP(Bool_type, src, 1);
     return env->builder.CreateLoad(llvm::Type::getInt1Ty(env->context), bool_ptr);
   }
 

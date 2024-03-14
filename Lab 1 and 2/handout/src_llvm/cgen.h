@@ -197,11 +197,12 @@ public:
   // generation for each method. You may need to add parameters to this
   // constructor.
   CgenEnvironment(CgenNode *cur_class)
-      : var_table(), cur_class(cur_class),
+      : var_table(), type_table(), cur_class(cur_class),
         class_table(*cur_class->get_classtable()), context(class_table.context),
         builder(class_table.builder), the_module(class_table.the_module)
   {
     var_table.enterscope();
+    type_table.enterscope();
   }
 
   CgenNode *get_class() { return cur_class; }
@@ -210,17 +211,18 @@ public:
   // Must return the CgenNode for a class given the symbol of its name
   CgenNode *type_to_class(Symbol t);
 
-  llvm::AllocaInst *find_in_scopes(Symbol name)
+  std::pair<llvm::Value *, llvm::Type *> find_in_scopes(Symbol name)
   {
-    return var_table.find_in_scopes(name);
+    return {var_table.find_in_scopes(name), type_table.find_in_scopes(name)};
   }
 
-  void add_binding(Symbol name, llvm::AllocaInst *val_ptr)
+  void add_binding(Symbol name, llvm::Value *val_ptr, llvm::Type *type)
   {
     var_table.insert(name, val_ptr);
+    type_table.insert(name, type);
   }
-  void open_scope() { var_table.enterscope(); }
-  void close_scope() { var_table.exitscope(); }
+  void open_scope() { var_table.enterscope(); type_table.enterscope(); }
+  void close_scope() { var_table.exitscope(); type_table.exitscope(); }
 
   // LLVM Utils:
   // Create a new llvm function in the current module
@@ -252,7 +254,8 @@ public:
 
 private:
   // mapping from variable names to memory locations
-  cool::SymbolTable<llvm::AllocaInst> var_table;
+  cool::SymbolTable<llvm::Value> var_table;
+  cool::SymbolTable<llvm::Type> type_table;
   CgenNode *cur_class;
 
 public:
