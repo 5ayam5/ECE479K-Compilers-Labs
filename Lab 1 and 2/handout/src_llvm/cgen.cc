@@ -9,6 +9,7 @@
 #include <sstream>
 #include <string>
 #include <llvm/Support/FileSystem.h>
+#include <iomanip>
 
 extern int cgen_debug, curr_lineno;
 
