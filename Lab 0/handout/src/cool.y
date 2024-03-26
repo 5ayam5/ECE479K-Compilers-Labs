@@ -7,6 +7,8 @@
 #include <iostream>
 #include "cool_tree.h"
 #include "utils.h"
+#include <vector>
+#include <tuple>
 
 /* Add your own C declarations here */
 
@@ -43,6 +45,9 @@ void yyerror(const char *s);
 */
 extern int VERBOSE_ERRORS;
 
+typedef std::tuple<Symbol, Symbol, Expression> *LetVar;
+typedef std::vector<LetVar> *LetList;
+
 %}
 
 /* A union of all the types that can be the result of parsing actions. */
@@ -59,6 +64,8 @@ extern int VERBOSE_ERRORS;
   Case case_;
   Cases cases;
   Expression expression;
+  LetVar let_var;
+  LetList let_list;
   Expressions expressions;
   char *error_msg;
 }
@@ -96,9 +103,27 @@ extern int VERBOSE_ERRORS;
 
 /* You will want to change the following line. */
 %type <features> dummy_feature_list
+%type <feature> feature
+%type <formals> formal_list
+%type <formal> formal
+%type <expression> expression
+%type <let_list> let_list
+%type <let_var> let_var
+%type <expressions> expression_list
+%type <cases> case_list
+%type <case_> case
 
 /* Precedence declarations go here. */
-
+%left '.'
+%left '@'
+%left '~'
+%left ISVOID
+%left '*' '/'
+%left '+' '-'
+%nonassoc '<' LE '='
+%left NOT
+%right ASSIGN
+%right IN
 
 %%
 /* 
@@ -108,23 +133,102 @@ program : class_list { ast_root = program($1); }
         ;
 
 class_list
-        : class            /* single class */
+        : class ';'            /* single class */
                 { $$ = single_Classes($1); }
-        | class_list class /* several classes */
+        | class_list class ';' /* several classes */
                 { $$ = append_Classes($1,single_Classes($2)); }
+        | class_list error ';' /* error in class definition */
+                { $$ = $1; }
         ;
 
 /* If no parent is specified, the class inherits from the Object class. */
-class  : CLASS TYPEID '{' dummy_feature_list '}' ';'
+class  : CLASS TYPEID '{' dummy_feature_list '}'
                 { $$ = class_($2,idtable.add_string("Object"),$4,
                               stringtable.add_string(curr_filename)); }
-        | CLASS TYPEID INHERITS TYPEID '{' dummy_feature_list '}' ';'
+        | CLASS TYPEID INHERITS TYPEID '{' dummy_feature_list '}'
                 { $$ = class_($2,$4,$6,stringtable.add_string(curr_filename)); }
         ;
 
 /* Feature list may be empty, but no empty features in list. */
 dummy_feature_list:        /* empty */
                 {  $$ = nil_Features(); }
+        | feature ';' dummy_feature_list
+                { $$ = append_Features(single_Features($1),$3); }
+        | error ';' dummy_feature_list
+                { $$ = $3; }
+        ;
+
+feature: OBJECTID ':' TYPEID { $$ = attr($1,$3,no_expr()); }
+        | OBJECTID ':' TYPEID ASSIGN expression { $$ = attr($1,$3,$5); }
+        | OBJECTID '(' formal_list ')' ':' TYPEID '{' expression '}'
+                { $$ = method($1,$3,$6,$8); }
+        ;
+
+formal_list:        /* empty */
+                { $$ = nil_Formals(); }
+        | formal formal_list
+                { $$ = append_Formals(single_Formals($1),$2); }
+        ;
+
+formal: OBJECTID ':' TYPEID { $$ = formal($1,$3); }
+        ;
+
+expression: OBJECTID ASSIGN expression { $$ = assign($1,$3); }
+        | expression '.' OBJECTID '(' expression_list ')' { $$ = dispatch($1,$3,$5); }
+        | expression '@' TYPEID '.' OBJECTID '(' expression_list ')' { $$ = static_dispatch($1,$3,$5,$7); }
+        | IF expression THEN expression ELSE expression FI { $$ = cond($2,$4,$6); }
+        | WHILE expression LOOP expression POOL { $$ = loop($2,$4); }
+        | '{' expression_list '}' { $$ = block($2); }
+        | LET let_list IN expression {
+                        auto let_list = *$2;
+                        auto first = *let_list.back();
+                        auto ret = let(std::get<0>(first), std::get<1>(first), std::get<2>(first), $4);
+                        for (auto it = ++let_list.rbegin(); it != let_list.rend(); ++it) {
+                                ret = let(std::get<0>(**it), std::get<1>(**it), std::get<2>(**it), ret);
+                        }
+                        $$ = ret;
+                }
+        | CASE expression OF case_list ESAC { $$ = typcase($2,$4); }
+        | NEW TYPEID { $$ = new_($2); }
+        | ISVOID expression { $$ = isvoid($2); }
+        | '~' expression { $$ = comp($2); }
+        | expression LE expression { $$ = leq($1,$3); }
+        | expression '<' expression { $$ = lt($1,$3); }
+        | expression '+' expression { $$ = plus($1,$3); }
+        | expression '-' expression { $$ = sub($1,$3); }
+        | expression '*' expression { $$ = mul($1,$3); }
+        | expression '/' expression { $$ = divide($1,$3); }
+        | NOT expression { $$ = neg($2); }
+        | expression '=' expression { $$ = eq($1,$3); }
+        | '(' expression ')' { $$ = $2; }
+        | INT_CONST { $$ = int_const($1); }
+        | STR_CONST { $$ = string_const($1); }
+        | BOOL_CONST { $$ = bool_const($1); }
+        | OBJECTID { $$ = object($1); }
+        ;
+
+let_list: let_var { $$ = new std::vector<LetVar>{$1}; }
+        | let_list ',' let_var { $$ = $1; $1->push_back($3); }
+        | let_list ',' error { $$ = $1; }
+        ;
+
+let_var: OBJECTID ':' TYPEID { $$ = new std::tuple<Symbol, Symbol, Expression>($1, $3, no_expr()); }
+        | OBJECTID ':' TYPEID ASSIGN expression { $$ = new std::tuple<Symbol, Symbol, Expression>($1, $3, $5); }
+        ;
+
+case_list: case { $$ = single_Cases($1); }
+        | case_list case { $$ = append_Cases($1,single_Cases($2)); }
+        ;
+
+case: OBJECTID ':' TYPEID DARROW expression ';' { $$ = branch($1,$3,$5); }
+        ;
+
+expression_list:        /* empty */
+                { $$ = nil_Expressions(); }
+        | expression expression_list
+                { $$ = append_Expressions(single_Expressions($1),$2); }
+        | error expression_list
+                { $$ = $2; }
         ;
 
 /* end of grammar */
