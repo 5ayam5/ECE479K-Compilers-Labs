@@ -1,3 +1,4 @@
 parser
 lexer
 cool.y.*
+cool.flex.*
