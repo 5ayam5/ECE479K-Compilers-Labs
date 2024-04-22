@@ -15,7 +15,6 @@ UnitLoopInfo UnitLoopAnalysis::run(Function &F, FunctionAnalysisManager &FAM) {
   dbgs() << "UnitLoopAnalysis running on " << F.getName() << "\n";
   // Acquires the Dominator Tree constructed by LLVM for this function. You may
   // find this useful in identifying the natural loops
-  DominatorTree &DT = FAM.getResult<DominatorTreeAnalysis>(F);
 
   UnitLoopInfo Loops;
 

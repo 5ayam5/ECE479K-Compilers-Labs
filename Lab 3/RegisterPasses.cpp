@@ -9,32 +9,32 @@
 /// Registers the three passes for this project with LLVM's pass mananger
 llvm::PassPluginLibraryInfo getUnitProjectPluginInfo() {
   return {LLVM_PLUGIN_API_VERSION, "ECE479K Lab 3", LLVM_VERSION_STRING,
-          [](PassBuilder& PB) {
+          [](PassBuilder &PB) {
             // Register LoopId
             PB.registerAnalysisRegistrationCallback(
-              [](FunctionAnalysisManager &FAM) {
-                FAM.registerPass([&]{ return ece479k::UnitLoopAnalysis(); });
-              });
+                [](FunctionAnalysisManager &FAM) {
+                  FAM.registerPass([&] { return ece479k::UnitLoopAnalysis(); });
+                });
             // Register LICM
             PB.registerPipelineParsingCallback(
-              [](StringRef Name, FunctionPassManager& FPM,
-                 ArrayRef<PassBuilder::PipelineElement>) {
-                if (Name == "unit-licm") {
-                  FPM.addPass(ece479k::UnitLICM());
-                  return true;
-                }
-                return false;
-              });
+                [](StringRef Name, FunctionPassManager &FPM,
+                   ArrayRef<PassBuilder::PipelineElement>) {
+                  if (Name == "unit-licm") {
+                    FPM.addPass(ece479k::UnitLICM());
+                    return true;
+                  }
+                  return false;
+                });
             // Register SCCP
             PB.registerPipelineParsingCallback(
-              [](StringRef Name, FunctionPassManager& FPM,
-                 ArrayRef<PassBuilder::PipelineElement>) {
-                if (Name == "unit-sccp") {
-                  FPM.addPass(ece479k::UnitSCCP());
-                  return true;
-                }
-                return false;
-              });
+                [](StringRef Name, FunctionPassManager &FPM,
+                   ArrayRef<PassBuilder::PipelineElement>) {
+                  if (Name == "unit-sccp") {
+                    FPM.addPass(ece479k::UnitSCCP());
+                    return true;
+                  }
+                  return false;
+                });
           }};
 }
 
