@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.13.4)
 project(lab3)
 set(CMAKE_CXX_STANDARD 20 CACHE STRING "")
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 find_package(LLVM 15 REQUIRED CONFIG)
 

@@ -9,7 +9,19 @@ namespace ece479k {
 /// function. At minimum this will need to identify the loops, may hold
 /// additional information you find useful for your LICM pass
 class UnitLoopInfo {
-  // Define this class to provide the information you need in LICM
+public:
+  class Loop {};
+
+  UnitLoopInfo() {}
+
+  // Add a loop to the list of loops
+  void addLoop(Loop *L) { Loops.push_back(L); }
+
+  // Get the list of loops
+  std::vector<Loop *> &getLoops() { return Loops; }
+
+private:
+  std::vector<Loop *> Loops;
 };
 
 /// Loop Identification Analysis Pass. Produces a UnitLoopInfo object which
@@ -24,5 +36,5 @@ public:
 
   UnitLoopInfo run(Function &F, FunctionAnalysisManager &AM);
 };
-} // namespace
+} // namespace ece479k
 #endif // INCLUDE_UNIT_LOOP_INFO_H
