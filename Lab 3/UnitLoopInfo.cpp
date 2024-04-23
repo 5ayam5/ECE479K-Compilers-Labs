@@ -8,6 +8,27 @@
 using namespace llvm;
 using namespace ece479k;
 
+void ece479k::Loop::initPreHeader()
+{
+  if (PreHeader != nullptr)
+    report_fatal_error("UnitLoopInfo: Preheader already set");
+
+  // initialize the preheader and update the predecessor of the header
+  PreHeader = BasicBlock::Create(Header->getContext(), "preheader", Header->getParent(), Header);
+  for (auto Pred : predecessors(Header))
+    if (Blocks.find(Pred) == Blocks.end()) // FIXME: fix the case when multiple loops have the same header
+    {
+      // Replace the edge from Pred to Header with an edge from Pred to PreHeader
+      Instruction *TI = Pred->getTerminator();
+      for (unsigned i = 0; i < TI->getNumSuccessors(); i++)
+        if (TI->getSuccessor(i) == Header)
+          TI->setSuccessor(i, PreHeader);
+    }
+  // insert a branch from the preheader to the header
+  IRBuilder<> Builder(PreHeader);
+  Builder.CreateBr(Header);
+}
+
 /// Main function for running the Loop Identification analysis. This function
 /// returns information about the loops in the function via the UnitLoopInfo
 /// object

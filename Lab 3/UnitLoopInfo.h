@@ -14,18 +14,25 @@ namespace ece479k
   class Loop
   {
   public:
-    Loop(BasicBlock *Header, BasicBlock *End) : Header(Header), End(End) {}
+    Loop(BasicBlock *Header, BasicBlock *End) : Header(Header), End(End), PreHeader(nullptr) {}
 
     // Add a basic block to the loop
     void addBlock(BasicBlock *BB) { Blocks.insert(BB); }
     BasicBlock *getHeader() { return Header; }
     BasicBlock *getEnd() { return End; }
-    // Get the list of blocks in the loop
+    BasicBlock *getPreHeader()
+    {
+      if (PreHeader == nullptr)
+        initPreHeader();
+      return PreHeader;
+    }
+    void initPreHeader();
     std::unordered_set<BasicBlock *> &getBlocks() { return Blocks; }
 
   private:
     BasicBlock *Header;
     BasicBlock *End;
+    BasicBlock *PreHeader;
     std::unordered_set<BasicBlock *> Blocks;
   };
 

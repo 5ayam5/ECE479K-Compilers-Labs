@@ -22,6 +22,7 @@ fi
 
 file=$1
 filewithoutext=${file%.*}
+fileext=${file##*.}
 
 debug=$2
 if [ $debug -eq 1 ]; then
@@ -32,6 +33,14 @@ fi
 
 # echo "Optimizing $file"
 # echo "Output: $filewithoutext.opt.ll"
+if [ $fileext == "cpp" ]; then
+  clang "$file" -c -O0 -Xclang -disable-O0-optnone -emit-llvm -S -o - \
+  | opt -load-pass-plugin=$lib -passes="function(unit-licm)" -S -o "$filewithoutext".opt.ll
+  #"function(mem2reg,instcombine,simplifycfg,adce),inline,globaldce,function(sroa,early-cse,unit-sccp,jump-threading,correlated-propagation,simplifycfg,instcombine,simplifycfg,reassociate,unit-licm,adce,simplifycfg,instcombine),globaldce" -S -o "$filewithoutext".opt.ll
+elif [ $fileext == "ll" ]; then
+  opt -load $lib -passes="function(mem2reg,instcombine,simplifycfg,adce),inline,globaldce,function(sroa,early-cse,unit-sccp,jump-threading,correlated-propagation,simplifycfg,instcombine,simplifycfg,reassociate,unit-licm,adce,simplifycfg,instcombine),globaldce" "$file" -S -o "$filewithoutext".opt.ll
+else
+  echo "Invalid file extension"
+  exit 1
+fi
 
-clang "$file" -c -O0 -Xclang -disable-O0-optnone -emit-llvm -S -o - \
-  | opt -load-pass-plugin=$lib -passes="function(mem2reg,instcombine,simplifycfg,adce),inline,globaldce,function(sroa,early-cse,unit-sccp,jump-threading,correlated-propagation,simplifycfg,instcombine,simplifycfg,reassociate,unit-licm,adce,simplifycfg,instcombine),globaldce" -S -o "$filewithoutext".opt.ll
