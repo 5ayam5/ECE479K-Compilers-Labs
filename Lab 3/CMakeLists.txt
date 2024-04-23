@@ -11,7 +11,7 @@ include_directories(${LLVM_INCLUDE_DIRS})
 
 add_library(Lab3 SHARED UnitLICM.cpp UnitLoopInfo.cpp UnitSCCP.cpp RegisterPasses.cpp)
 
-llvm_map_components_to_libnames(llvm_libs support core irreader)
+llvm_map_components_to_libnames(llvm_libs irreader transformutils)
 target_link_libraries(Lab3 PRIVATE ${llvm_libs})
 
 if(NOT LLVM_ENABLE_RTTI)
