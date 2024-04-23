@@ -11,23 +11,6 @@ void ece479k::Loop::initPreHeader() {
   if (PreHeader != nullptr)
     return;
 
-  // // initialize the preheader and update the predecessor of the header
-  // PreHeader = BasicBlock::Create(Header->getContext(), "preheader",
-  //                                Header->getParent(), Header);
-  // for (auto Pred : predecessors(Header))
-  //   if (Blocks.find(Pred) == Blocks.end()) {
-  //     // FIXME: fix the case when multiple loops have the same header
-  //     // Replace the edge from Pred to Header with an edge from Pred to
-  //     // PreHeader
-  //     Instruction *TI = Pred->getTerminator();
-  //     for (unsigned i = 0; i < TI->getNumSuccessors(); i++)
-  //       if (TI->getSuccessor(i) == Header)
-  //         TI->setSuccessor(i, PreHeader);
-  //   }
-  // // insert a branch from the preheader to the header
-  // IRBuilder<> Builder(PreHeader);
-  // // Builder.CreateBr(Header);
-
   std::vector<BasicBlock *> externalPreds;
   for (auto Pred : predecessors(Header))
     if (!findBlock(Pred))
@@ -79,7 +62,7 @@ UnitLoopInfo UnitLoopAnalysis::run(Function &F, FunctionAnalysisManager &FAM) {
   UnitLoopInfo Loops;
   // For each backedge, find the loop
   for (auto &Edge : BackEdges) {
-    std::shared_ptr<Loop> L = std::make_shared<Loop>(Edge.second, Edge.first);
+    auto L = Loops.getLoop(Edge.second);
     // Find the loop body
     std::vector<BasicBlock *> Worklist;
     Worklist.push_back(Edge.first);
@@ -92,16 +75,13 @@ UnitLoopInfo UnitLoopAnalysis::run(Function &F, FunctionAnalysisManager &FAM) {
           Worklist.push_back(Pred);
     }
     L->sortBlocks(DT);
-    Loops.addLoop(L);
   }
 #ifndef NDEBUG
   // Print out the loops
   dbgs() << "Loops in " << F.getName() << ":\n";
-  for (auto &L : Loops.getLoops()) {
+  for (auto &[_, L] : Loops.getLoops()) {
     dbgs() << "Loop starting at ";
     L->getHeader()->printAsOperand(dbgs(), false);
-    dbgs() << " ending at ";
-    L->getEnd()->printAsOperand(dbgs(), false);
     dbgs() << " with blocks:\n";
     for (auto &BB : L->getBlocks()) {
       BB->printAsOperand(dbgs(), false);

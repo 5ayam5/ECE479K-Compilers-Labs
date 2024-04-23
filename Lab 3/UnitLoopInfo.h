@@ -13,8 +13,8 @@ namespace ece479k {
 /// additional information you find useful for your LICM pass
 class Loop {
 public:
-  Loop(BasicBlock *Header, BasicBlock *End)
-      : Header(Header), End(End), PreHeader(nullptr),
+  Loop(BasicBlock *Header)
+      : Header(Header), PreHeader(nullptr),
         splitPoint(Header->getFirstNonPHI()) {}
 
   // Add a basic block to the loop
@@ -26,7 +26,6 @@ public:
     return AddedBlocks.find(BB) != AddedBlocks.end();
   }
   BasicBlock *getHeader() { return Header; }
-  BasicBlock *getEnd() { return End; }
   BasicBlock *getPreHeader() {
     initPreHeader();
     return PreHeader;
@@ -42,7 +41,6 @@ public:
 
 private:
   BasicBlock *Header;
-  BasicBlock *End;
   BasicBlock *PreHeader;
   Instruction *splitPoint;
   std::vector<BasicBlock *> Blocks;
@@ -53,14 +51,20 @@ class UnitLoopInfo {
 public:
   UnitLoopInfo() {}
 
-  // Add a loop to the list of loops
-  void addLoop(std::shared_ptr<Loop> L) { Loops.insert(L); }
+  std::shared_ptr<Loop> getLoop(BasicBlock *BB) {
+    if (Loops.find(BB) == Loops.end())
+      Loops.insert({BB, std::make_shared<Loop>(BB)});
+    return Loops[BB];
+  }
 
-  // Get the list of loops
-  std::unordered_set<std::shared_ptr<Loop>> &getLoops() { return Loops; }
+  std::unordered_map<BasicBlock *, std::shared_ptr<Loop>> &getLoops() {
+    return Loops;
+  }
 
 private:
-  std::unordered_set<std::shared_ptr<Loop>> Loops;
+  std::unordered_map<BasicBlock *, std::shared_ptr<Loop>> Loops;
+  // FIXME: store the loops in a nested order so that inner loops are optimized
+  // first
 };
 
 /// Loop Identification Analysis Pass. Produces a UnitLoopInfo object which

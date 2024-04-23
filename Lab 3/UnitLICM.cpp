@@ -28,11 +28,13 @@ PreservedAnalyses UnitLICM::run(Function &F, FunctionAnalysisManager &FAM) {
 
     std::vector<Instruction *> toRemove;
     for (auto &I : *BB) {
-      if (loopInvariantInstructions.find(&I) != loopInvariantInstructions.end())
+      if (loopInvariantInstructions.find(&I) !=
+              loopInvariantInstructions.end() ||
+          isa<PHINode>(&I) || isa<CallInst>(&I))
         continue;
       bool allLoopInvariant = true;
       for (auto &Op : I.operands()) {
-        if (loopInvariantInstructions.find(dyn_cast<Instruction>(Op)) ==
+        if (loopInvariantInstructions.find(Op) ==
                 loopInvariantInstructions.end() &&
             !isa<Constant>(Op)) {
           allLoopInvariant = false;
@@ -65,7 +67,7 @@ PreservedAnalyses UnitLICM::run(Function &F, FunctionAnalysisManager &FAM) {
 
   // Perform the optimization
   // For each loop in the function
-  for (auto &L : Loops.getLoops()) {
+  for (auto &[_, L] : Loops.getLoops()) {
     loopInvariantInstructions = allInstructions;
     for (auto &BB : L->getBlocks())
       for (auto &I : *BB)

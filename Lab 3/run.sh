@@ -33,7 +33,7 @@ fi
 
 # echo "Optimizing $file"
 # echo "Output: $filewithoutext.opt.ll"
-if [ $fileext == "cpp" ]; then
+if [ $fileext == "cpp" ] || [ $fileext == "c" ]; then
   clang "$file" -c -O0 -Xclang -disable-O0-optnone -emit-llvm -S -o "$filewithoutext".ll
   opt -load-pass-plugin=$lib $debug_flag -passes="function(mem2reg,instcombine,simplifycfg,adce),inline,globaldce,function(sroa,early-cse,unit-sccp,jump-threading,correlated-propagation,simplifycfg,instcombine,simplifycfg,reassociate,unit-licm,adce,simplifycfg,instcombine),globaldce" "$filewithoutext".ll -S -o "$filewithoutext".opt.ll
   opt -load-pass-plugin=$lib $debug_flag -passes="function(mem2reg,instcombine,simplifycfg,adce),inline,globaldce,function(sroa,early-cse,unit-sccp,jump-threading,correlated-propagation,simplifycfg,instcombine,simplifycfg,reassociate)" "$filewithoutext".ll -S -o "$filewithoutext".ll
