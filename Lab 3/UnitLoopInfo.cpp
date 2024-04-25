@@ -81,10 +81,17 @@ UnitLoopInfo UnitLoopAnalysis::run(Function &F, FunctionAnalysisManager &FAM) {
   Loops.sortLoops(DT);
   for (auto &L : Loops.getLoops()) {
     L->getPreHeader();
-    for (auto &BB : L->getBlocks())
+    for (auto &BB : L->getBlocks()) {
+      if (isa<ReturnInst>(BB->getTerminator())) {
+        L->addExitBlock(BB);
+        continue;
+      }
       for (auto Succ : successors(BB))
-        if (!L->findBlock(Succ))
-          L->addExitBlock(Succ);
+        if (!L->findBlock(Succ)) {
+          L->addExitBlock(BB);
+          break;
+        }
+    }
   }
 
 #ifndef NDEBUG
