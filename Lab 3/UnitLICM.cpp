@@ -14,24 +14,36 @@ using namespace ece479k;
 /// Main function for running the LICM optimization
 PreservedAnalyses UnitLICM::run(Function &F, FunctionAnalysisManager &FAM) {
   dbgs() << "UnitLICM running on " << F.getName() << "\n";
-  // Acquires the UnitLoopInfo object constructed by your Loop Identification
-  // (LoopAnalysis) pass
   UnitLoopInfo &Loops = FAM.getResult<UnitLoopAnalysis>(F);
+  DominatorTree DT(F);
 
   std::unordered_map<BasicBlock *, BasicBlock *> preheadedBlocks;
   std::unordered_set<Value *> allInstructions;
   std::unordered_set<Value *> loopInvariantInstructions;
 
-  auto processBB = [&loopInvariantInstructions, &preheadedBlocks](
-                       std::shared_ptr<Loop> L, BasicBlock *BB) -> bool {
+  auto processBB = [&loopInvariantInstructions, &preheadedBlocks,
+                    &DT](std::shared_ptr<Loop> L, BasicBlock *BB) -> bool {
     bool noChange = true;
+
+    bool dominatesAllExits = true;
+    for (auto ExitBlock : L->getExitBlocks())
+      if (!DT.dominates(BB, ExitBlock)) {
+        dominatesAllExits = false;
+        break;
+      }
 
     std::vector<Instruction *> toRemove;
     for (auto &I : *BB) {
-      if (loopInvariantInstructions.find(&I) !=
-              loopInvariantInstructions.end() ||
-          isa<PHINode>(&I) || isa<CallInst>(&I))
+      if (loopInvariantInstructions.find(&I) != loopInvariantInstructions.end())
         continue;
+      if (!dominatesAllExits && I.mayHaveSideEffects())
+        continue;
+      if (I.isTerminator() || isa<PHINode>(I) || isa<CallInst>(I) ||
+          isa<InvokeInst>(I) || isa<AllocaInst>(I))
+        continue;
+
+      // TODO: check if operands are declared inside or outside the loop
+      // this will cause issues sometimes???
       bool allLoopInvariant = true;
       for (auto &Op : I.operands()) {
         if (loopInvariantInstructions.find(Op) ==
@@ -67,7 +79,7 @@ PreservedAnalyses UnitLICM::run(Function &F, FunctionAnalysisManager &FAM) {
 
   // Perform the optimization
   // For each loop in the function
-  for (auto &[_, L] : Loops.getLoops()) {
+  for (auto &L : Loops.getLoops()) {
     loopInvariantInstructions = allInstructions;
     for (auto &BB : L->getBlocks())
       for (auto &I : *BB)
@@ -82,7 +94,6 @@ PreservedAnalyses UnitLICM::run(Function &F, FunctionAnalysisManager &FAM) {
         noChange &= processBB(L, BB);
       }
     }
-    L->initPreHeader();
     preheadedBlocks.insert({L->getHeader(), L->getPreHeader()});
   }
 

@@ -7,8 +7,8 @@ using namespace llvm;
 namespace ece479k {
 /// Loop Invariant Code Motion Optimization Pass
 struct UnitLICM : PassInfoMixin<UnitLICM> {
-  PreservedAnalyses run(Function& F, FunctionAnalysisManager& FAM);
+  PreservedAnalyses run(Function &F, FunctionAnalysisManager &FAM);
 };
-} // namespace
+} // namespace ece479k
 
 #endif // INCLUDE_UNIT_LICM_H

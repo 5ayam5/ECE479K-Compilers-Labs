@@ -14,37 +14,45 @@ namespace ece479k {
 class Loop {
 public:
   Loop(BasicBlock *Header)
-      : Header(Header), PreHeader(nullptr),
-        splitPoint(Header->getFirstNonPHI()) {}
+      : Header(Header), PreHeader(Header->getUniquePredecessor()) {}
 
-  // Add a basic block to the loop
   void addBlock(BasicBlock *BB) {
     Blocks.push_back(BB);
     AddedBlocks.insert(BB);
   }
+
+  void addExitBlock(BasicBlock *BB) { ExitBlocks.insert(BB); }
+
   bool findBlock(BasicBlock *BB) {
     return AddedBlocks.find(BB) != AddedBlocks.end();
   }
+
   BasicBlock *getHeader() { return Header; }
+
   BasicBlock *getPreHeader() {
     initPreHeader();
     return PreHeader;
   }
-  void initPreHeader();
+
   void sortBlocks(DominatorTree &DT) {
     std::sort(Blocks.begin(), Blocks.end(),
               [&DT](const BasicBlock *a, const BasicBlock *b) {
                 return DT.dominates(a, b);
               });
   }
+
   std::vector<BasicBlock *> &getBlocks() { return Blocks; }
 
+  std::unordered_set<BasicBlock *> &getExitBlocks() { return ExitBlocks; }
+
 private:
+  void initPreHeader();
+
   BasicBlock *Header;
   BasicBlock *PreHeader;
-  Instruction *splitPoint;
   std::vector<BasicBlock *> Blocks;
   std::unordered_set<BasicBlock *> AddedBlocks;
+  std::unordered_set<BasicBlock *> ExitBlocks;
 };
 
 class UnitLoopInfo {
@@ -52,19 +60,26 @@ public:
   UnitLoopInfo() {}
 
   std::shared_ptr<Loop> getLoop(BasicBlock *BB) {
-    if (Loops.find(BB) == Loops.end())
+    if (Loops.find(BB) == Loops.end()) {
       Loops.insert({BB, std::make_shared<Loop>(BB)});
+      LoopList.push_back(Loops[BB]);
+    }
     return Loops[BB];
   }
 
-  std::unordered_map<BasicBlock *, std::shared_ptr<Loop>> &getLoops() {
-    return Loops;
+  std::vector<std::shared_ptr<Loop>> &getLoops() { return LoopList; }
+
+  void sortLoops(DominatorTree &DT) {
+    std::sort(
+        LoopList.begin(), LoopList.end(),
+        [&DT](const std::shared_ptr<Loop> a, const std::shared_ptr<Loop> b) {
+          return !DT.dominates(a->getHeader(), b->getHeader());
+        });
   }
 
 private:
   std::unordered_map<BasicBlock *, std::shared_ptr<Loop>> Loops;
-  // FIXME: store the loops in a nested order so that inner loops are optimized
-  // first
+  std::vector<std::shared_ptr<Loop>> LoopList;
 };
 
 /// Loop Identification Analysis Pass. Produces a UnitLoopInfo object which

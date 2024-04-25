@@ -38,8 +38,7 @@ UnitLoopInfo UnitLoopAnalysis::run(Function &F, FunctionAnalysisManager &FAM) {
   }
 #endif
   // Acquire the dominator tree for the function
-  DominatorTree DT;
-  DT.recalculate(F);
+  DominatorTree DT(F);
 #ifndef NDEBUG
   dbgs() << "Dominator Tree for " << F.getName() << ":\n";
   DT.print(dbgs());
@@ -60,26 +59,38 @@ UnitLoopInfo UnitLoopAnalysis::run(Function &F, FunctionAnalysisManager &FAM) {
   }
 #endif
   UnitLoopInfo Loops;
-  // For each backedge, find the loop
   for (auto &Edge : BackEdges) {
     auto L = Loops.getLoop(Edge.second);
-    // Find the loop body
+
     std::vector<BasicBlock *> Worklist;
     Worklist.push_back(Edge.first);
+
     while (!Worklist.empty()) {
       BasicBlock *BB = Worklist.back();
       Worklist.pop_back();
       L->addBlock(BB);
+
       for (auto Pred : predecessors(BB))
         if (DT.dominates(Edge.second, Pred) && !L->findBlock(Pred))
           Worklist.push_back(Pred);
     }
+
     L->sortBlocks(DT);
   }
+
+  Loops.sortLoops(DT);
+  for (auto &L : Loops.getLoops()) {
+    L->getPreHeader();
+    for (auto &BB : L->getBlocks())
+      for (auto Succ : successors(BB))
+        if (!L->findBlock(Succ))
+          L->addExitBlock(Succ);
+  }
+
 #ifndef NDEBUG
   // Print out the loops
   dbgs() << "Loops in " << F.getName() << ":\n";
-  for (auto &[_, L] : Loops.getLoops()) {
+  for (auto &L : Loops.getLoops()) {
     dbgs() << "Loop starting at ";
     L->getHeader()->printAsOperand(dbgs(), false);
     dbgs() << " with blocks:\n";
