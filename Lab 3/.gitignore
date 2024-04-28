@@ -2,4 +2,4 @@ build
 *.opt.ll
 
 debug
-*.ll
+*.ll*

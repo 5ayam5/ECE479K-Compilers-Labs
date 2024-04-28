@@ -8,7 +8,10 @@ file=$1
 filewithoutext=${file%.*}
 fileext=${file##*.}
 
-debug=$2
+debug=0
+if [ $# -eq 2 ]; then
+  debug=$2
+fi
 if [ $debug -eq 1 ]; then
   cd debug && make -j
   exit_code=$?
@@ -36,7 +39,8 @@ fi
 if [ $fileext == "cpp" ] || [ $fileext == "c" ]; then
   clang "$file" -c -O0 -Xclang -disable-O0-optnone -emit-llvm -S -o "$filewithoutext".ll
   opt -load-pass-plugin=$lib $debug_flag -passes="function(mem2reg,instcombine,simplifycfg,adce),inline,globaldce,function(sroa,early-cse,unit-sccp,jump-threading,correlated-propagation,simplifycfg,instcombine,simplifycfg,reassociate,unit-licm,adce,simplifycfg,instcombine),globaldce" "$filewithoutext".ll -S -o "$filewithoutext".opt.ll
-  opt -load-pass-plugin=$lib $debug_flag -passes="function(mem2reg,instcombine,simplifycfg,adce),inline,globaldce,function(sroa,early-cse,unit-sccp,jump-threading,correlated-propagation,simplifycfg,instcombine,simplifycfg,reassociate)" "$filewithoutext".ll -S -o "$filewithoutext".ll
+  opt -load-pass-plugin=$lib $debug_flag -passes="function(mem2reg,instcombine,simplifycfg,adce),inline,globaldce,function(sroa,early-cse)" "$filewithoutext".ll -S -o "$filewithoutext".ll.presscp
+  opt -load-pass-plugin=$lib $debug_flag -passes="function(mem2reg,instcombine,simplifycfg,adce),inline,globaldce,function(sroa,early-cse,unit-sccp,jump-threading,correlated-propagation,simplifycfg,instcombine,simplifycfg,reassociate)" "$filewithoutext".ll -S -o "$filewithoutext".ll.prelicm
 elif [ $fileext == "ll" ]; then
   opt -load-pass-plugin=$lib $debug_flag -passes="function(mem2reg,instcombine,simplifycfg,adce),inline,globaldce,function(sroa,early-cse,unit-sccp,jump-threading,correlated-propagation,simplifycfg,instcombine,simplifycfg,reassociate,unit-licm,adce,simplifycfg,instcombine),globaldce" "$file" -S -o "$filewithoutext".opt.ll
 else
