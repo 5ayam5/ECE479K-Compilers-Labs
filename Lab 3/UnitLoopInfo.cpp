@@ -1,5 +1,5 @@
 #include "llvm/IR/Dominators.h"
-#include "llvm/IR/IRBuilder.h"
+#include "llvm/IR/Instructions.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 
 #include "UnitLoopInfo.h"
