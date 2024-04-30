@@ -8,6 +8,14 @@
 #define DEBUG_TYPE UnitLICM
 // Define any statistics here
 
+struct Stats {
+  int hoistedInstructions;
+  int hoistedLoads;
+  int hoistedStores;
+
+  Stats() : hoistedInstructions(0), hoistedLoads(0), hoistedStores(0) {}
+};
+
 using namespace llvm;
 using namespace ece479k;
 
@@ -16,13 +24,14 @@ PreservedAnalyses UnitLICM::run(Function &F, FunctionAnalysisManager &FAM) {
   dbgs() << "UnitLICM running on " << F.getName() << "\n";
   UnitLoopInfo &Loops = FAM.getResult<UnitLoopAnalysis>(F);
   DominatorTree DT(F);
+  Stats stats;
 
   std::unordered_map<BasicBlock *, BasicBlock *> preheadedBlocks;
   std::unordered_set<Value *> allInstructions;
   std::unordered_set<Value *> loopInvariantInstructions;
 
-  auto processBB = [&loopInvariantInstructions, &preheadedBlocks,
-                    &DT](std::shared_ptr<Loop> L, BasicBlock *BB) -> bool {
+  auto processBB = [&loopInvariantInstructions, &preheadedBlocks, &DT,
+                    &stats](std::shared_ptr<Loop> L, BasicBlock *BB) -> bool {
     bool noChange = true;
 
     bool dominatesAllExits = true;
@@ -61,6 +70,12 @@ PreservedAnalyses UnitLICM::run(Function &F, FunctionAnalysisManager &FAM) {
 #endif
         loopInvariantInstructions.insert(&I);
         toRemove.push_back(&I);
+        if (isa<LoadInst>(I))
+          stats.hoistedLoads++;
+        else if (isa<StoreInst>(I))
+          stats.hoistedStores++;
+        else
+          stats.hoistedInstructions++;
         noChange = false;
       }
     }
@@ -96,6 +111,11 @@ PreservedAnalyses UnitLICM::run(Function &F, FunctionAnalysisManager &FAM) {
     }
     preheadedBlocks.insert({L->getHeader(), L->getPreHeader()});
   }
+
+  llvm::outs() << '\t' << F.getName() << ": Hoisted "
+               << stats.hoistedInstructions << " instructions, "
+               << stats.hoistedLoads << " loads, " << stats.hoistedStores
+               << " stores\n";
 
   // Set proper preserved analyses
   return PreservedAnalyses::none();

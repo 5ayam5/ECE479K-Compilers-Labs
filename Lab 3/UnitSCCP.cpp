@@ -11,6 +11,13 @@
 #define DEBUG_TYPE UnitSCCP
 // Define any statistics here
 
+struct Stats {
+  int optimizedInstructions;
+  int unreachableBlocks;
+
+  Stats() : optimizedInstructions(0), unreachableBlocks(0) {}
+};
+
 namespace ece479k {
 struct pair_hash {
   template <class T1, class T2>
@@ -26,6 +33,7 @@ struct pair_hash {
 llvm::PreservedAnalyses
 ece479k::UnitSCCP::run(llvm::Function &F, llvm::FunctionAnalysisManager &FAM) {
   llvm::dbgs() << "UnitSCCP running on " << F.getName() << "\n";
+  Stats stats;
 
   std::unordered_map<std::pair<llvm::BasicBlock *, llvm::BasicBlock *>, bool,
                      pair_hash>
@@ -297,6 +305,7 @@ ece479k::UnitSCCP::run(llvm::Function &F, llvm::FunctionAnalysisManager &FAM) {
       llvm::dbgs() << *I << " -> (" << Lat.value << ", " << Lat.constant
                    << ")\n";
 #endif // !NDEBUG
+      stats.optimizedInstructions++;
       if (Lat.value == Lattice::CONSTANT) {
         llvm::Constant *CI = llvm::ConstantInt::get(
             I->getType(), Lat.constant, I->getType()->isIntegerTy());
@@ -311,22 +320,11 @@ ece479k::UnitSCCP::run(llvm::Function &F, llvm::FunctionAnalysisManager &FAM) {
   std::unordered_set<llvm::BasicBlock *> toDelete;
   for (auto &BB : F)
     if (visitedBBs.find(&BB) == visitedBBs.end())
-      toDelete.insert(&BB);
+      toDelete.insert(&BB), stats.unreachableBlocks++;
 
-#ifndef NDEBUG
-      // for (auto BB : toDelete) {
-      //   llvm::dbgs() << "Deleting basic block:\n";
-      //   BB->print(llvm::dbgs());
-      // }
-#endif // !NDEBUG
-
-  // for (auto BB : toDelete) {
-  //   // replace the terminator with unreachable
-  //   llvm::Instruction *Term = BB->getTerminator();
-  //   llvm::Instruction *Unreachable =
-  //       new llvm::UnreachableInst(Term->getContext());
-  //   llvm::ReplaceInstWithInst(Term, Unreachable);
-  // }
+  llvm::outs() << '\t' << F.getName() << ": " << stats.optimizedInstructions
+               << " instructions optimized, " << stats.unreachableBlocks
+               << " unreachable blocks removed\n";
 
   // Set proper preserved analyses
   return llvm::PreservedAnalyses::none();

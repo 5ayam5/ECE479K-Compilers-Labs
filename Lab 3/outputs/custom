@@ -1,0 +1,18 @@
+hello.cpp
+	main: 0 instructions optimized, 0 unreachable blocks removed
+	main: Hoisted 0 instructions, 0 loads, 0 stores
+invariant.cpp
+	_Z3fooi: 0 instructions optimized, 1 unreachable blocks removed
+	_Z3fooi: Hoisted 0 instructions, 0 loads, 0 stores
+	_Z3barv: 0 instructions optimized, 1 unreachable blocks removed
+	_Z3barv: Hoisted 0 instructions, 0 loads, 0 stores
+	main: 0 instructions optimized, 0 unreachable blocks removed
+	main: Hoisted 0 instructions, 0 loads, 0 stores
+simple_loop.cpp
+	main: 1 instructions optimized, 4 unreachable blocks removed
+	main: Hoisted 0 instructions, 0 loads, 0 stores
+	_Z4funcv: 0 instructions optimized, 1 unreachable blocks removed
+	_Z4funcv: Hoisted 0 instructions, 0 loads, 0 stores
+test_sccp.cpp
+	_Z4foozv: 0 instructions optimized, 0 unreachable blocks removed
+	_Z4foozv: Hoisted 0 instructions, 0 loads, 0 stores
