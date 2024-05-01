@@ -45,7 +45,7 @@ ece479k::UnitSCCP::run(llvm::Function &F, llvm::FunctionAnalysisManager &FAM) {
   std::unordered_set<std::pair<llvm::Instruction *, llvm::Instruction *>,
                      pair_hash>
       SSAWL;
-  std::unordered_set<llvm::BasicBlock *> visitedBBs, reachedBBs;
+  std::unordered_set<llvm::BasicBlock *> visitedBBs;
   std::unordered_map<llvm::Value *, std::unordered_set<llvm::Instruction *>>
       DefUseMap;
 
@@ -238,8 +238,7 @@ ece479k::UnitSCCP::run(llvm::Function &F, llvm::FunctionAnalysisManager &FAM) {
       } else {
         if (LatCell[I].value == Lattice::BOTTOM || LatCell[I].constant == 0)
           FlowWL.insert(std::make_pair(I->getParent(), I->getSuccessor(0)));
-        else if (LatCell[I].value == Lattice::BOTTOM ||
-                 LatCell[I].constant != 0)
+        if (LatCell[I].value == Lattice::BOTTOM || LatCell[I].constant != 0)
           FlowWL.insert(std::make_pair(I->getParent(), I->getSuccessor(1)));
       }
     }
@@ -274,7 +273,6 @@ ece479k::UnitSCCP::run(llvm::Function &F, llvm::FunctionAnalysisManager &FAM) {
       llvm::BasicBlock *BB = pair.second;
       if (BB == nullptr)
         continue;
-      reachedBBs.insert(BB);
       for (auto &I : *BB)
         if (isa<llvm::PHINode>(I))
           visitPhi(*dyn_cast<llvm::PHINode>(&I));
@@ -288,7 +286,6 @@ ece479k::UnitSCCP::run(llvm::Function &F, llvm::FunctionAnalysisManager &FAM) {
     } else {
       auto pair = *SSAWL.begin();
       SSAWL.erase(pair);
-      reachedBBs.insert(pair.second->getParent());
       llvm::Instruction *I = pair.second;
       if (llvm::isa<llvm::PHINode>(*I))
         visitPhi(*dyn_cast<llvm::PHINode>(I));
@@ -321,7 +318,7 @@ ece479k::UnitSCCP::run(llvm::Function &F, llvm::FunctionAnalysisManager &FAM) {
   }
   std::unordered_set<llvm::BasicBlock *> toDelete;
   for (auto &BB : F)
-    if (reachedBBs.find(&BB) == reachedBBs.end())
+    if (visitedBBs.find(&BB) == visitedBBs.end())
       toDelete.insert(&BB), stats.unreachableBlocks++;
 
   llvm::outs() << '\t' << F.getName() << ": " << stats.optimizedInstructions

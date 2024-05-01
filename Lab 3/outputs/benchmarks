@@ -6,11 +6,11 @@ PR491.c
 almabench.c
 	anpm: 0 instructions optimized, 0 unreachable blocks removed
 	anpm: Hoisted 0 instructions, 0 loads, 0 stores
-	planetpv: 1 instructions optimized, 2 unreachable blocks removed
-	planetpv: Hoisted 0 instructions, 0 loads, 0 stores
+	planetpv: 0 instructions optimized, 0 unreachable blocks removed
+	planetpv: Hoisted 1 instructions, 0 loads, 0 stores
 	radecdist: 0 instructions optimized, 0 unreachable blocks removed
 	radecdist: Hoisted 0 instructions, 0 loads, 0 stores
-	main: 1 instructions optimized, 3 unreachable blocks removed
+	main: 1 instructions optimized, 0 unreachable blocks removed
 	main: Hoisted 3 instructions, 2 loads, 0 stores
 doloop.c
 	foo: 1 instructions optimized, 0 unreachable blocks removed
@@ -18,30 +18,30 @@ doloop.c
 fannkuch.c
 	main: 0 instructions optimized, 0 unreachable blocks removed
 	main: Hoisted 0 instructions, 0 loads, 0 stores
-	fannkuch: 7 instructions optimized, 17 unreachable blocks removed
+	fannkuch: 2 instructions optimized, 0 unreachable blocks removed
 	fannkuch: Hoisted 3 instructions, 4 loads, 0 stores
 ffbench.c
-	main: 0 instructions optimized, 22 unreachable blocks removed
+	main: 0 instructions optimized, 0 unreachable blocks removed
 	main: Hoisted 6 instructions, 1 loads, 0 stores
-	fourn: 2 instructions optimized, 1 unreachable blocks removed
-	fourn: Hoisted 5 instructions, 1 loads, 0 stores
+	fourn: 0 instructions optimized, 0 unreachable blocks removed
+	fourn: Hoisted 9 instructions, 0 loads, 0 stores
 matmul.c
-	matmul: 0 instructions optimized, 1 unreachable blocks removed
+	matmul: 0 instructions optimized, 0 unreachable blocks removed
 	matmul: Hoisted 5 instructions, 1 loads, 0 stores
 n-body.c
-	advance: 0 instructions optimized, 3 unreachable blocks removed
+	advance: 0 instructions optimized, 0 unreachable blocks removed
 	advance: Hoisted 6 instructions, 9 loads, 0 stores
 	energy: 0 instructions optimized, 0 unreachable blocks removed
 	energy: Hoisted 2 instructions, 4 loads, 0 stores
 	offset_momentum: 0 instructions optimized, 0 unreachable blocks removed
 	offset_momentum: Hoisted 0 instructions, 0 loads, 0 stores
-	main: 0 instructions optimized, 1 unreachable blocks removed
+	main: 0 instructions optimized, 0 unreachable blocks removed
 	main: Hoisted 0 instructions, 0 loads, 0 stores
 nesting.c
-	foo: 2 instructions optimized, 1 unreachable blocks removed
+	foo: 0 instructions optimized, 0 unreachable blocks removed
 	foo: Hoisted 0 instructions, 0 loads, 0 stores
 nsieve-bits.c
-	main: 0 instructions optimized, 12 unreachable blocks removed
+	main: 0 instructions optimized, 0 unreachable blocks removed
 	main: Hoisted 0 instructions, 0 loads, 0 stores
 one-iter.c
 	foo: 0 instructions optimized, 0 unreachable blocks removed
@@ -60,23 +60,23 @@ puzzle.c
 	srand: Hoisted 0 instructions, 0 loads, 0 stores
 	randInt: 2 instructions optimized, 0 unreachable blocks removed
 	randInt: Hoisted 0 instructions, 0 loads, 0 stores
-	shuffle: 2 instructions optimized, 0 unreachable blocks removed
+	shuffle: 1 instructions optimized, 0 unreachable blocks removed
 	shuffle: Hoisted 0 instructions, 0 loads, 0 stores
 	createRandomArray: 1 instructions optimized, 0 unreachable blocks removed
 	createRandomArray: Hoisted 0 instructions, 0 loads, 0 stores
 	findDuplicate: 0 instructions optimized, 0 unreachable blocks removed
 	findDuplicate: Hoisted 0 instructions, 0 loads, 0 stores
-	main: 0 instructions optimized, 1 unreachable blocks removed
+	main: 0 instructions optimized, 0 unreachable blocks removed
 	main: Hoisted 0 instructions, 0 loads, 0 stores
 random.c
 	foo: 0 instructions optimized, 0 unreachable blocks removed
 	foo: Hoisted 0 instructions, 0 loads, 0 stores
 recursive.c
-	ack: 2 instructions optimized, 3 unreachable blocks removed
+	ack: 5 instructions optimized, 0 unreachable blocks removed
 	ack: Hoisted 0 instructions, 0 loads, 0 stores
-	fib: 1 instructions optimized, 1 unreachable blocks removed
+	fib: 3 instructions optimized, 0 unreachable blocks removed
 	fib: Hoisted 0 instructions, 0 loads, 0 stores
-	fibFP: 0 instructions optimized, 1 unreachable blocks removed
+	fibFP: 0 instructions optimized, 0 unreachable blocks removed
 	fibFP: Hoisted 0 instructions, 0 loads, 0 stores
 	tak: 4 instructions optimized, 0 unreachable blocks removed
 	tak: Hoisted 0 instructions, 0 loads, 0 stores
@@ -87,11 +87,11 @@ recursive.c
 spectral-norm.c
 	eval_A: 6 instructions optimized, 0 unreachable blocks removed
 	eval_A: Hoisted 0 instructions, 0 loads, 0 stores
-	eval_A_times_u: 0 instructions optimized, 1 unreachable blocks removed
+	eval_A_times_u: 0 instructions optimized, 0 unreachable blocks removed
 	eval_A_times_u: Hoisted 0 instructions, 1 loads, 0 stores
-	eval_At_times_u: 0 instructions optimized, 1 unreachable blocks removed
+	eval_At_times_u: 0 instructions optimized, 0 unreachable blocks removed
 	eval_At_times_u: Hoisted 0 instructions, 1 loads, 0 stores
 	eval_AtA_times_u: 0 instructions optimized, 0 unreachable blocks removed
 	eval_AtA_times_u: Hoisted 0 instructions, 0 loads, 0 stores
-	main: 1 instructions optimized, 1 unreachable blocks removed
+	main: 1 instructions optimized, 0 unreachable blocks removed
 	main: Hoisted 0 instructions, 0 loads, 0 stores

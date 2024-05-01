@@ -1,37 +1,37 @@
 huffbench.c
-	generate_test_data: 0 instructions optimized, 1 unreachable blocks removed
+	generate_test_data: 0 instructions optimized, 0 unreachable blocks removed
 	generate_test_data: Hoisted 0 instructions, 0 loads, 0 stores
-	compdecomp: 1 instructions optimized, 53 unreachable blocks removed
+	compdecomp: 1 instructions optimized, 0 unreachable blocks removed
 	compdecomp: Hoisted 12 instructions, 11 loads, 0 stores
 	heap_adjust: 1 instructions optimized, 0 unreachable blocks removed
 	heap_adjust: Hoisted 3 instructions, 1 loads, 0 stores
-	main: 1 instructions optimized, 1 unreachable blocks removed
+	main: 1 instructions optimized, 0 unreachable blocks removed
 	main: Hoisted 1 instructions, 1 loads, 0 stores
 	random4: 0 instructions optimized, 0 unreachable blocks removed
 	random4: Hoisted 0 instructions, 0 loads, 0 stores
 lpbench.c
-	matgen: 0 instructions optimized, 7 unreachable blocks removed
+	matgen: 0 instructions optimized, 0 unreachable blocks removed
 	matgen: Hoisted 3 instructions, 1 loads, 0 stores
-	idamax: 1 instructions optimized, 8 unreachable blocks removed
+	idamax: 4 instructions optimized, 0 unreachable blocks removed
 	idamax: Hoisted 0 instructions, 0 loads, 0 stores
-	dscal: 2 instructions optimized, 4 unreachable blocks removed
+	dscal: 3 instructions optimized, 0 unreachable blocks removed
 	dscal: Hoisted 0 instructions, 0 loads, 0 stores
-	daxpy: 4 instructions optimized, 4 unreachable blocks removed
+	daxpy: 11 instructions optimized, 0 unreachable blocks removed
 	daxpy: Hoisted 0 instructions, 0 loads, 0 stores
-	dgefa: 0 instructions optimized, 2 unreachable blocks removed
+	dgefa: 0 instructions optimized, 0 unreachable blocks removed
 	dgefa: Hoisted 0 instructions, 0 loads, 0 stores
-	dgesl: 0 instructions optimized, 3 unreachable blocks removed
+	dgesl: 0 instructions optimized, 0 unreachable blocks removed
 	dgesl: Hoisted 0 instructions, 0 loads, 0 stores
-	main: 1 instructions optimized, 4 unreachable blocks removed
+	main: 1 instructions optimized, 0 unreachable blocks removed
 	main: Hoisted 1 instructions, 1 loads, 0 stores
 	random_double: 0 instructions optimized, 0 unreachable blocks removed
 	random_double: Hoisted 0 instructions, 0 loads, 0 stores
 whetstone.c
-	main: 2 instructions optimized, 3 unreachable blocks removed
-	main: Hoisted 16 instructions, 17 loads, 3 stores
+	main: 0 instructions optimized, 0 unreachable blocks removed
+	main: Hoisted 58 instructions, 59 loads, 7 stores
 	POUT: 0 instructions optimized, 0 unreachable blocks removed
 	POUT: Hoisted 0 instructions, 0 loads, 0 stores
-	PA: 0 instructions optimized, 1 unreachable blocks removed
+	PA: 0 instructions optimized, 0 unreachable blocks removed
 	PA: Hoisted 22 instructions, 18 loads, 5 stores
 	P3: 0 instructions optimized, 0 unreachable blocks removed
 	P3: Hoisted 0 instructions, 0 loads, 0 stores
